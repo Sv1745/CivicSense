@@ -1,0 +1,16 @@
+{
+  "placeholderImages": [
+    {
+      "id": "hero-map",
+      "description": "A stylized map of a city for the hero section.",
+      "imageUrl": "https://picsum.photos/seed/1/600/400",
+      "imageHint": "city map"
+    },
+    {
+      "id": "admin-map",
+      "description": "A map with pins for the admin dashboard.",
+      "imageUrl": "https://picsum.photos/seed/map/1200/675",
+      "imageHint": "city map pins"
+    }
+  ]
+}
