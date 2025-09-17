@@ -66,19 +66,22 @@ export default function Home() {
               {recentIssues.map((issue) => (
                 <Card key={issue.id} className="flex flex-col">
                   <CardHeader>
-                    <div className="relative aspect-[16/9] w-full">
-                      <Image
-                        src={issue.imageUrl}
-                        alt={issue.description}
-                        fill
-                        className="rounded-t-lg object-cover"
-                        data-ai-hint={issue.imageHint}
-                      />
+                    <div className="relative aspect-[16/9] w-full bg-gray-100 flex items-center justify-center">
+                      {issue.photos && issue.photos.length > 0 ? (
+                        <Image
+                          src={issue.photos[0]}
+                          alt={issue.description}
+                          fill
+                          className="rounded-t-lg object-cover"
+                        />
+                      ) : (
+                        <div className="text-gray-400 text-sm">No image available</div>
+                      )}
                     </div>
                   </CardHeader>
                   <CardContent className="flex-1 space-y-2">
                     <CardTitle className="text-lg">{issue.category}</CardTitle>
-                    <CardDescription>{issue.summary}</CardDescription>
+                    <CardDescription>{issue.description}</CardDescription>
                      <div className="flex items-center text-sm text-muted-foreground">
                         <MapPin className="mr-1 h-4 w-4" />
                         {issue.location.address}

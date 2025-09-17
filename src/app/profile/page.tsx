@@ -1,10 +1,10 @@
 'use client';
 
 import { Header } from "@/components/layout/Header";
-import { IssueReportForm } from "@/components/forms/IssueReportForm";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
+import { UserProfileForm } from "@/components/forms/UserProfileForm";
 
-export default function ReportIssuePage() {
+export default function ProfilePage() {
   return (
     <ProtectedRoute requireAuth={true}>
       <div className="flex min-h-screen w-full flex-col">
@@ -12,12 +12,12 @@ export default function ReportIssuePage() {
         <main className="flex-1 py-12 md:py-16">
           <div className="container mx-auto max-w-2xl px-4">
             <div className="space-y-2 text-center mb-8">
-              <h1 className="text-3xl font-bold tracking-tighter sm:text-4xl font-headline">File a Public Complaint</h1>
+              <h1 className="text-3xl font-bold tracking-tighter sm:text-4xl font-headline">My Profile</h1>
               <p className="text-muted-foreground">
-                Help improve your community. Fill out the form below to report a civic issue.
+                Manage your account information and preferences.
               </p>
             </div>
-            <IssueReportForm />
+            <UserProfileForm />
           </div>
         </main>
       </div>

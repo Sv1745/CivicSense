@@ -1,0 +1,301 @@
+'use client';
+
+import React, { createContext, useContext, useEffect, useState } from 'react';
+import { User as SupabaseUser, AuthError } from '@supabase/supabase-js';
+import supabase from '@/lib/supabase';
+import { offlineModeService } from '@/lib/offline-mode';
+import type { Database } from '@/lib/database.types';
+
+type Profile = Database['public']['Tables']['profiles']['Row'];
+
+// Check if we're in demo mode (no valid Supabase config)
+const isDemoMode = () => {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  return !url || !key || url.includes('your-project-ref') || key.includes('your-anon-key');
+};
+
+// Test Supabase connection
+const testConnection = async (): Promise<boolean> => {
+  try {
+    const { error } = await supabase.from('profiles').select('count').limit(1);
+    return !error;
+  } catch (error) {
+    console.warn('⚠️ Supabase connection failed:', error);
+    return false;
+  }
+};
+
+interface AuthContextType {
+  user: Profile | null;
+  supabaseUser: SupabaseUser | null;
+  loading: boolean;
+  isOffline: boolean;
+  signUp: (email: string, password: string, displayName: string) => Promise<void>;
+  signIn: (email: string, password: string) => Promise<void>;
+  signInWithGoogle: () => Promise<void>;
+  logout: () => Promise<void>;
+  signOut: () => Promise<void>; // Add signOut as alias for logout
+  resetPassword: (email: string) => Promise<void>;
+  updateProfile: (updates: Partial<Profile>) => Promise<void>;
+}
+
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+export function useAuth() {
+  const context = useContext(AuthContext);
+  if (context === undefined) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
+}
+
+export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const [user, setUser] = useState<Profile | null>(null);
+  const [supabaseUser, setSupabaseUser] = useState<SupabaseUser | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [isOffline, setIsOffline] = useState(false);
+
+  useEffect(() => {
+    const initializeAuth = async () => {
+      // Test connection first
+      const connectionWorks = await testConnection();
+      
+      if (!connectionWorks || isDemoMode()) {
+        console.log('🎭 Running in offline/demo mode - Mock authentication active');
+        setIsOffline(true);
+        offlineModeService.setOnlineStatus(false);
+        
+        const demoUser: Profile = {
+          id: 'demo-user-123',
+          email: 'demo@civicsense.com',
+          full_name: 'Demo User',
+          avatar_url: null,
+          phone: null,
+          address: null,
+          city: 'Demo City',
+          state: 'Demo State',
+          role: 'citizen',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+        
+        setUser(demoUser);
+        setSupabaseUser(null);
+        setLoading(false);
+        return;
+      }
+
+      // Connection works - proceed with real auth
+      setIsOffline(false);
+      offlineModeService.setOnlineStatus(true);
+
+      try {
+        // Get initial session
+        const { data: { session }, error } = await supabase.auth.getSession();
+        if (error) throw error;
+
+        setSupabaseUser(session?.user ?? null);
+        if (session?.user) {
+          await fetchUserProfile(session.user.id);
+        } else {
+          setLoading(false);
+        }
+
+        // Listen for auth changes
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(
+          async (event, session) => {
+            setSupabaseUser(session?.user ?? null);
+            
+            if (session?.user) {
+              await fetchUserProfile(session.user.id);
+            } else {
+              setUser(null);
+              setLoading(false);
+            }
+          }
+        );
+
+        return () => subscription.unsubscribe();
+      } catch (error) {
+        console.error('❌ Auth initialization failed:', error);
+        // Fall back to offline mode
+        setIsOffline(true);
+        setLoading(false);
+      }
+    };
+
+    initializeAuth();
+  }, []);
+
+  const fetchUserProfile = async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
+
+      if (error) {
+        console.error('Error fetching user profile:', error);
+        setUser(null);
+      } else {
+        setUser(data);
+      }
+    } catch (error) {
+      console.error('Error fetching user profile:', error);
+      setUser(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const createUserProfile = async (userId: string, email: string, displayName: string) => {
+    const profile: Database['public']['Tables']['profiles']['Insert'] = {
+      id: userId,
+      email: email,
+      full_name: displayName,
+      role: 'citizen',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    const { error } = await supabase.from('profiles').insert(profile);
+    
+    if (error) {
+      console.error('Error creating user profile:', error.message || error);
+      throw new Error(error.message || 'Failed to create user profile');
+    }
+
+    return profile;
+  };
+
+  const signUp = async (email: string, password: string, displayName: string) => {
+    if (isDemoMode()) {
+      console.log('🎭 Demo mode: Sign up simulation');
+      return;
+    }
+
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          full_name: displayName,
+        }
+      }
+    });
+
+    if (error) throw error;
+    
+    if (data.user) {
+      try {
+        await createUserProfile(data.user.id, email, displayName);
+      } catch (profileError) {
+        console.error('Failed to create user profile:', profileError);
+        // The user account was created but profile creation failed
+        // The user can still sign in, but they may need to complete their profile
+        throw new Error('Account created but profile setup incomplete. Please try signing in.');
+      }
+    }
+  };
+
+  const signIn = async (email: string, password: string) => {
+    if (isDemoMode()) {
+      console.log('🎭 Demo mode: Sign in simulation');
+      return;
+    }
+
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (error) throw error;
+  };
+
+  const signInWithGoogle = async () => {
+    if (isDemoMode()) {
+      console.log('🎭 Demo mode: Google sign in simulation');
+      return;
+    }
+
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/callback`
+      }
+    });
+
+    if (error) throw error;
+  };
+
+  const logout = async () => {
+    if (isDemoMode()) {
+      console.log('🎭 Demo mode: Logout simulation');
+      setUser(null);
+      setSupabaseUser(null);
+      return;
+    }
+
+    const { error } = await supabase.auth.signOut();
+    if (error) throw error;
+  };
+
+  const resetPassword = async (email: string) => {
+    if (isDemoMode()) {
+      console.log('🎭 Demo mode: Password reset simulation');
+      return;
+    }
+
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/reset-password`
+    });
+
+    if (error) throw error;
+  };
+
+  const updateProfile = async (updates: Partial<Profile>) => {
+    if (isDemoMode()) {
+      console.log('🎭 Demo mode: Profile update simulation');
+      if (user) {
+        setUser({ ...user, ...updates, updated_at: new Date().toISOString() });
+      }
+      return;
+    }
+
+    if (!supabaseUser) throw new Error('No authenticated user');
+
+    const { error } = await supabase
+      .from('profiles')
+      .update({ ...updates, updated_at: new Date().toISOString() })
+      .eq('id', supabaseUser.id);
+
+    if (error) throw error;
+
+    // Update local state
+    if (user) {
+      setUser({ ...user, ...updates, updated_at: new Date().toISOString() });
+    }
+  };
+
+  const value: AuthContextType = {
+    user,
+    supabaseUser,
+    loading,
+    isOffline,
+    signUp,
+    signIn,
+    signInWithGoogle,
+    logout,
+    signOut: logout, // Add signOut as alias for logout
+    resetPassword,
+    updateProfile,
+  };
+
+  return (
+    <AuthContext.Provider value={value}>
+      {children}
+    </AuthContext.Provider>
+  );
+}

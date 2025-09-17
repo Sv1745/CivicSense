@@ -1,6 +1,6 @@
-"use client";
+﻿"use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -16,97 +16,87 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Card, CardContent } from "@/components/ui/card";
-import { LocateIcon, Upload, Mic, Loader2 } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Progress } from "@/components/ui/progress";
+import { 
+  MapPin, 
+  Upload, 
+  Mic,
+  Loader2, 
+  Camera, 
+  X,
+  CheckCircle
+} from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
+import { useAuth } from "@/contexts/AuthContext";
+import { categoryService, departmentService, issueService, storageService } from "@/lib/database";
+import type { Database } from "@/lib/database.types";
 
+type Category = Database['public']['Tables']['categories']['Row'];
+type Department = Database['public']['Tables']['departments']['Row'];
 
 const formSchema = z.object({
-  description: z.string().min(10, {
-    message: "Description must be at least 10 characters.",
+  title: z.string().min(5, "Title must be at least 5 characters"),
+  description: z.string().min(10, "Description must be at least 10 characters"),
+  category_id: z.string().min(1, "Please select a category"),
+  department_id: z.string().min(1, "Please select a department"),
+  priority: z.enum(['low', 'medium', 'high', 'urgent'], {
+    required_error: "Please select priority level",
   }),
-  state: z.string().min(1, { message: "State/UT is required." }),
-  city: z.string().min(1, { message: "City/District is required." }),
-  jurisdiction: z.string().min(1, { message: "Jurisdiction is required." }),
-  department: z.string().min(1, { message: "Department is required." }),
-  location: z.string().min(1, { message: "Address is required." }),
-  photo: z.any().optional(),
+  address: z.string().min(5, "Address is required"),
+  city: z.string().min(1, "City is required"),
+  state: z.string().min(1, "State is required"),
 });
+
+interface LocationData {
+  lat: number;
+  lng: number;
+  address: string;
+  city: string;
+  state: string;
+}
 
 export function IssueReportForm() {
   const [isLocating, setIsLocating] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [photos, setPhotos] = useState<File[]>([]);
+  const [locationData, setLocationData] = useState<LocationData | null>(null);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [filteredDepartments, setFilteredDepartments] = useState<Department[]>([]);
+  const [isRecording, setIsRecording] = useState(false);
+  const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
+  
   const { toast } = useToast();
+  const { user } = useAuth();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
+      title: "",
       description: "",
-      state: "",
+      category_id: "",
+      department_id: "",
+      priority: "medium",
+      address: "",
       city: "",
-      jurisdiction: "",
-      department: "",
-      location: "",
+      state: "",
     },
   });
 
-  async function handleLocation() {
-    setIsLocating(true);
-    if (!navigator.geolocation) {
-      setIsLocating(false);
-      toast({
-        variant: 'destructive',
-        title: 'Geolocation not supported',
-        description: 'Your browser does not support geolocation.',
-      });
-      return;
-    }
-
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const { latitude, longitude } = position.coords;
-        // In a real app, you would use a reverse geocoding service here.
-        // For this demo, we'll simulate it.
-        console.log("Found location:", { latitude, longitude });
-        const mockAddress = "Connaught Place, New Delhi";
-        form.setValue("location", mockAddress);
-        form.setValue("city", "New Delhi");
-        form.setValue("state", "Delhi");
-        form.setValue("jurisdiction", "New Delhi Municipal Council");
-        setIsLocating(false);
-        toast({
-          title: "Location Found",
-          description: `Set to: ${mockAddress}`,
-        });
-      },
-      (error) => {
-        setIsLocating(false);
-        toast({
-          variant: 'destructive',
-          title: 'Unable to retrieve location',
-          description: error.message,
-        });
-      }
-    );
-  }
-
-  async function onSubmit(values: z.infer<typeof formSchema>) {
-    setIsSubmitting(true);
-    console.log("Form submitted with values:", values);
-
-    await new Promise((resolve) => setTimeout(resolve, 2000));
-
-    setIsSubmitting(false);
-    toast({
-      title: "Complaint Filed!",
-      description: "Thank you for being an active citizen.",
-    });
-    form.reset();
-  }
+  const priorityLevels = [
+    { value: 'low', label: 'Low', color: 'text-green-600' },
+    { value: 'medium', label: 'Medium', color: 'text-yellow-600' },
+    { value: 'high', label: 'High', color: 'text-orange-600' },
+    { value: 'urgent', label: 'Urgent', color: 'text-red-600' }
+  ];
 
   const indianStates = [
-    "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh", 
+    "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh",
     "Goa", "Gujarat", "Haryana", "Himachal Pradesh", "Jharkhand", "Karnataka",
     "Kerala", "Madhya Pradesh", "Maharashtra", "Manipur", "Meghalaya", "Mizoram",
     "Nagaland", "Odisha", "Punjab", "Rajasthan", "Sikkim", "Tamil Nadu", "Telangana",
@@ -114,59 +104,559 @@ export function IssueReportForm() {
     "Chandigarh", "Dadra and Nagar Haveli and Daman and Diu", "Delhi", "Jammu and Kashmir",
     "Ladakh", "Lakshadweep", "Puducherry"
   ];
-  
-  const departments = [
-    "BBMP (Public Works)",
-    "Noida Authority (Electrical)",
-    "MCGM (Solid Waste Mgmt)",
-    "Delhi PWD",
-    "Traffic Police",
-    "Land Department",
-    "Other"
-  ]
+
+  // Load categories and departments on component mount
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const [categoriesData, departmentsData] = await Promise.all([
+          categoryService.getCategories(),
+          departmentService.getDepartments()
+        ]);
+        
+        setCategories(categoriesData);
+        setDepartments(departmentsData);
+      } catch (error) {
+        console.error('Error loading form data:', error);
+        toast({
+          variant: 'destructive',
+          title: 'Error loading form data',
+          description: 'Please refresh the page and try again.',
+        });
+      }
+    };
+
+    loadData();
+  }, [toast]);
+
+  // Filter departments when city/state changes
+  useEffect(() => {
+    const city = form.watch('city');
+    const state = form.watch('state');
+    
+    // Show all departments if no location is selected
+    if (!city && !state) {
+      setFilteredDepartments(departments);
+      return;
+    }
+    
+    // More flexible filtering - show departments that serve:
+    // 1. The specific city/state
+    // 2. Multiple cities/states (Various Cities, Multi-State, All Cities, All Areas)
+    // 3. The selected state (even if city doesn't match exactly)
+    const filtered = departments.filter(dept => {
+      const deptCity = dept.city?.toLowerCase() || '';
+      const deptState = dept.state?.toLowerCase() || '';
+      const userCity = city?.toLowerCase() || '';
+      const userState = state?.toLowerCase() || '';
+      
+      // Always include departments that serve multiple locations
+      if (deptCity.includes('various') || 
+          deptCity.includes('all') || 
+          deptCity.includes('major') ||
+          deptState.includes('various') || 
+          deptState.includes('multi')) {
+        return true;
+      }
+      
+      // Include if state matches or department serves the user's state
+      if (userState && (deptState === userState || deptState.includes(userState))) {
+        return true;
+      }
+      
+      // Include if city matches
+      if (userCity && deptCity === userCity) {
+        return true;
+      }
+      
+      return false;
+    });
+    
+    setFilteredDepartments(filtered.length > 0 ? filtered : departments);
+  }, [form.watch('city'), form.watch('state'), departments]);
+
+  const handleLocation = async () => {
+    setIsLocating(true);
+    
+    if (!navigator.geolocation) {
+      toast({
+        variant: 'destructive',
+        title: 'Geolocation not supported',
+        description: 'Your browser does not support geolocation',
+      });
+      setIsLocating(false);
+      return;
+    }
+
+    try {
+      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 300000
+        });
+      });
+
+      const { latitude, longitude } = position.coords;
+      
+      // In production, you would use Google Maps Geocoding API to get real address
+      // For now, we just capture the coordinates and let user fill in the address
+      const locationData: LocationData = {
+        lat: latitude,
+        lng: longitude,
+        address: "", // Don't auto-fill with mock data
+        city: "", // Let user enter their actual city
+        state: "" // Let user select their actual state
+      };
+
+      setLocationData(locationData);
+      // Don't auto-fill form fields with mock data
+      // Let the user enter their actual location details
+
+      toast({
+        title: "Location captured",
+        description: `GPS coordinates recorded: ${latitude.toFixed(6)}, ${longitude.toFixed(6)}`,
+      });
+    } catch (error: any) {
+      toast({
+        variant: 'destructive',
+        title: 'Location access failed',
+        description: error.message || 'Unable to get your location',
+      });
+    } finally {
+      setIsLocating(false);
+    }
+  };
+
+  const handlePhotoUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files || []);
+    const validFiles = files.filter(file => file.type.startsWith('image/'));
+    
+    if (validFiles.length !== files.length) {
+      toast({
+        variant: 'destructive',
+        title: 'Invalid files',
+        description: 'Please select only image files',
+      });
+    }
+
+    if (photos.length + validFiles.length > 5) {
+      toast({
+        variant: 'destructive',
+        title: 'Too many photos',
+        description: 'Maximum 5 photos allowed',
+      });
+      return;
+    }
+
+    setPhotos(prev => [...prev, ...validFiles]);
+  };
+
+  const removePhoto = (index: number) => {
+    setPhotos(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaRecorderRef.current = new MediaRecorder(stream);
+      
+      const chunks: BlobPart[] = [];
+      
+      mediaRecorderRef.current.ondataavailable = (event) => {
+        chunks.push(event.data);
+      };
+      
+      mediaRecorderRef.current.onstop = () => {
+        const blob = new Blob(chunks, { type: 'audio/wav' });
+        setAudioBlob(blob);
+        stream.getTracks().forEach(track => track.stop());
+      };
+      
+      mediaRecorderRef.current.start();
+      setIsRecording(true);
+      
+      toast({
+        title: "Recording started",
+        description: "Speak now to record your voice note",
+      });
+    } catch (error) {
+      toast({
+        variant: 'destructive',
+        title: 'Recording failed',
+        description: 'Could not access microphone',
+      });
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+      
+      toast({
+        title: "Recording stopped",
+        description: "Voice note has been saved",
+      });
+    }
+  };
+
+  const uploadFiles = async (userId: string): Promise<string[]> => {
+    if (photos.length === 0) return [];
+
+    const uploadPromises = photos.map(async (photo, index) => {
+      try {
+        const publicUrl = await storageService.uploadIssuePhoto(
+          photo, 
+          userId, 
+          (progress) => {
+            // Update progress for this specific photo
+            const baseProgress = 25;
+            const photoProgress = Math.floor((progress / 100) * (50 / photos.length));
+            const totalProgress = baseProgress + (index * (50 / photos.length)) + photoProgress;
+            setUploadProgress(Math.min(totalProgress, 75));
+          }
+        );
+        return publicUrl;
+      } catch (error) {
+        console.error(`Error uploading photo ${index + 1}:`, error);
+        // Return null for failed uploads but don't stop the entire process
+        return null;
+      }
+    });
+
+    const photoUrls = await Promise.all(uploadPromises);
+    
+    // Filter out failed uploads and show warning if any failed
+    const successfulUrls = photoUrls.filter(url => url !== null) as string[];
+    const failedCount = photoUrls.length - successfulUrls.length;
+    
+    if (failedCount > 0 && successfulUrls.length > 0) {
+      toast({
+        variant: 'default', // Changed to default instead of destructive
+        title: 'Some photos uploaded',
+        description: `${successfulUrls.length} out of ${photoUrls.length} photos uploaded successfully.`,
+      });
+    }
+    
+    return successfulUrls;
+  };
+
+  const uploadVoiceNote = async (userId: string): Promise<string | null> => {
+    if (!audioBlob) return null;
+
+    try {
+      const fileName = `voice_note_${Date.now()}.wav`;
+      const file = new File([audioBlob], fileName, { type: 'audio/wav' });
+      
+      return await storageService.uploadIssueAudio(
+        file, 
+        userId,
+        (progress) => {
+          // Voice note upload contributes to the final 25% of progress
+          const voiceProgress = Math.floor((progress / 100) * 15);
+          setUploadProgress(75 + voiceProgress);
+        }
+      );
+    } catch (error) {
+      console.error('Error uploading voice note:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Voice note upload failed',
+        description: 'The voice note could not be uploaded, but your issue will still be submitted.',
+      });
+      return null;
+    }
+  };
+
+  const onSubmit = async (values: z.infer<typeof formSchema>) => {
+    if (!user) {
+      toast({
+        variant: 'destructive',
+        title: 'Authentication required',
+        description: 'Please sign in to submit an issue report.',
+      });
+      return;
+    }
+
+    if (!locationData) {
+      toast({
+        variant: 'destructive',
+        title: 'Location required',
+        description: 'Please capture your location first',
+      });
+      return;
+    }
+
+    setIsSubmitting(true);
+    setUploadProgress(10);
+
+    try {
+      // Create issue in database
+      const issueData: Database['public']['Tables']['issues']['Insert'] = {
+        title: values.title,
+        description: values.description,
+        category_id: values.category_id,
+        department_id: values.department_id,
+        user_id: user.id,
+        priority: values.priority as 'low' | 'medium' | 'high' | 'urgent',
+        latitude: locationData.lat,
+        longitude: locationData.lng,
+        photo_urls: [], // Will be updated after upload
+      };
+
+      console.log('Creating issue with data:', JSON.stringify(issueData, null, 2));
+      console.log('User data:', { id: user.id, email: user.email });
+      console.log('Location data:', locationData);
+
+      // Add timeout with shorter duration and better error handling
+      const issueCreationPromise = issueService.createIssue(issueData);
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Issue creation timed out after 15 seconds - this usually means database tables need to be set up')), 15000)
+      );
+
+      const issue = await Promise.race([issueCreationPromise, timeoutPromise]) as Database['public']['Tables']['issues']['Row'];
+      if (!issue || !issue.id) throw new Error('Failed to create issue - no issue returned from service');
+
+      setUploadProgress(20);
+
+      // Try to upload files (don't let upload failures block issue creation)
+      let photoUrls: string[] = [];
+      let voiceNoteUrl: string | null = null;
+
+      // Only attempt uploads if we have files to upload
+      if (photos.length > 0 || audioBlob) {
+        try {
+          console.log('📤 Starting file uploads...');
+          [photoUrls, voiceNoteUrl] = await Promise.all([
+            photos.length > 0 ? uploadFiles(user.id) : Promise.resolve([]),
+            audioBlob ? uploadVoiceNote(user.id) : Promise.resolve(null)
+          ]);
+          console.log('✅ File uploads completed');
+        } catch (uploadError) {
+          console.error('Upload error (continuing anyway):', uploadError);
+          
+          // Show specific error message but don't fail the whole submission
+          if (uploadError instanceof Error) {
+            if (uploadError.message.includes('Storage not available')) {
+              toast({
+                variant: 'default', // Changed from destructive to default
+                title: 'Files not uploaded',
+                description: 'Your issue was submitted successfully, but attachments could not be uploaded due to storage configuration.',
+              });
+            } else if (uploadError.message.includes('not configured')) {
+              toast({
+                variant: 'default',
+                title: 'Storage not configured',
+                description: 'Your issue was submitted successfully without attachments. Storage will be set up soon.',
+              });
+            } else {
+              toast({
+                variant: 'default',
+                title: 'Upload partially failed',
+                description: 'Your issue was submitted successfully. Some attachments may not have been uploaded.',
+              });
+            }
+          }
+        }
+      }
+
+      setUploadProgress(90);
+
+      // Update issue with file URLs (only if we have successful uploads)
+      if (photoUrls.length > 0 || voiceNoteUrl) {
+        await issueService.updateIssue(issue.id, {
+          photo_urls: photoUrls,
+          audio_url: voiceNoteUrl
+        });
+      }
+
+      setUploadProgress(100);
+
+      toast({
+        title: "Report submitted successfully!",
+        description: `Issue #${issue.id.slice(-8)} has been created and assigned to ${departments.find(d => d.id === values.department_id)?.name}.`,
+      });
+
+      // Reset form
+      form.reset();
+      setPhotos([]);
+      setAudioBlob(null);
+      setLocationData(null);
+      setUploadProgress(0);
+
+    } catch (error) {
+      console.error('Error submitting report:', error);
+      console.error('Error details:', { 
+        name: error instanceof Error ? error.name : 'Unknown', 
+        message: error instanceof Error ? error.message : JSON.stringify(error),
+        stack: error instanceof Error ? error.stack : 'No stack trace'
+      });
+      
+      toast({
+        variant: 'destructive',
+        title: 'Submission failed',
+        description: error instanceof Error ? error.message : 'An unexpected error occurred. Please try again later.',
+      });
+    } finally {
+      setIsSubmitting(false);
+      setUploadProgress(0);
+    }
+  };
 
   return (
-    <Card>
+    <Card className="w-full max-w-4xl mx-auto">
+      <CardHeader>
+        <CardTitle className="text-2xl text-center">Report a Civic Issue</CardTitle>
+        <p className="text-center text-muted-foreground">
+          Help improve your community by reporting civic issues
+        </p>
+      </CardHeader>
       <CardContent className="p-6">
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+            
             <FormField
               control={form.control}
-              name="description"
+              name="title"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Complaint Description</FormLabel>
+                  <FormLabel>Issue Title</FormLabel>
                   <FormControl>
-                    <Textarea
-                      placeholder="e.g., There is severe water-logging near the market after the rain."
-                      {...field}
-                      rows={5}
-                    />
+                    <Input placeholder="Brief title of the issue" {...field} />
                   </FormControl>
                   <FormDescription>
-                    Provide as much detail as possible.
+                    Provide a clear, concise title for your issue
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
             />
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-               <FormField
+            <FormField
+              control={form.control}
+              name="description"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Detailed Description</FormLabel>
+                  <FormControl>
+                    <Textarea
+                      placeholder="Describe the issue in detail..."
+                      className="min-h-[120px]"
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormDescription>
+                    Include as much detail as possible to help authorities understand the issue
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <div className="grid md:grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="category_id"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Issue Category</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select category" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {categories.map(category => (
+                          <SelectItem key={category.id} value={category.id}>
+                            <div className="flex items-center gap-2">
+                              <span>{category.icon}</span>
+                              {category.name}
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="priority"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Priority Level</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select priority" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {priorityLevels.map(priority => (
+                          <SelectItem key={priority.value} value={priority.value}>
+                            <div className={`font-medium ${priority.color}`}>
+                              {priority.label}
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-medium">Location Information</h3>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleLocation}
+                  disabled={isLocating}
+                >
+                  {isLocating ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <MapPin className="mr-2 h-4 w-4" />
+                  )}
+                  {isLocating ? "Getting Location..." : "Get Current Location"}
+                </Button>
+              </div>
+
+              {locationData && (
+                <div className="p-3 bg-green-50 rounded-lg border border-green-200">
+                  <p className="text-sm text-green-800 flex items-center gap-2">
+                    <CheckCircle className="h-4 w-4" />
+                    GPS coordinates captured successfully! Please fill in your address details below.
+                  </p>
+                </div>
+              )}
+
+              <div className="grid md:grid-cols-2 gap-4">
+                <FormField
                   control={form.control}
                   name="state"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>State / Union Territory</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormLabel>State/UT</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
                           <SelectTrigger>
-                            <SelectValue placeholder="Select a state/UT" />
+                            <SelectValue placeholder="Select state" />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
                           {indianStates.map(state => (
-                            <SelectItem key={state} value={state}>{state}</SelectItem>
+                            <SelectItem key={state} value={state}>
+                              {state}
+                            </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
@@ -174,123 +664,190 @@ export function IssueReportForm() {
                     </FormItem>
                   )}
                 />
-                 <FormField
+
+                <FormField
                   control={form.control}
                   name="city"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>City / District</FormLabel>
+                      <FormLabel>City/District</FormLabel>
                       <FormControl>
-                        <Input placeholder="e.g., Mumbai" {...field} />
+                        <Input placeholder="Enter your city/district" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-            </div>
-            
-            <FormField
-              control={form.control}
-              name="jurisdiction"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Local Jurisdiction</FormLabel>
-                  <FormControl>
-                    <Input placeholder="e.g., Ward A, Brihanmumbai Municipal Corporation" {...field} />
-                  </FormControl>
-                  <FormDescription>
-                    The local governing body for the area (e.g., Municipal Ward, Panchayat).
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+              </div>
 
-             <FormField
+              <FormField
                 control={form.control}
-                name="department"
+                name="address"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Concerned Department</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormLabel>Detailed Address</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        placeholder="Enter the specific location/address where the issue is located (e.g., Near City Mall, MG Road, Sector 5)"
+                        className="min-h-[80px]"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="department_id"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Relevant Department</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder="Select a department" />
-                        </Trigger>
+                          <SelectValue placeholder="Select department" />
+                        </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {departments.map(dept => (
-                          <SelectItem key={dept} value={dept}>{dept}</SelectItem>
+                        {filteredDepartments.map(dept => (
+                          <SelectItem key={dept.id} value={dept.id}>
+                            <div className="space-y-1">
+                              <div className="font-medium">{dept.name}</div>
+                              <div className="text-xs text-muted-foreground">
+                                {dept.city}, {dept.state}
+                              </div>
+                            </div>
+                          </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                     <FormDescription>
-                      The government department responsible for this type of issue.
+                      Department will be filtered based on your selected location
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
               />
+            </div>
 
-
-            <FormField
-              control={form.control}
-              name="location"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Full Address or Nearest Landmark</FormLabel>
-                  <div className="flex gap-2">
-                    <FormControl>
-                      <Input placeholder="e.g., Outside Andheri Station (West)" {...field} />
-                    </FormControl>
-                    <Button type="button" variant="outline" onClick={handleLocation} disabled={isLocating}>
-                      {isLocating ? <Loader2 className="h-4 w-4 animate-spin" /> : <LocateIcon className="h-4 w-4" />}
-                      <span className="sr-only">Get current location</span>
-                    </Button>
-                  </div>
-                  <FormDescription>
-                    Enter a specific address or use the button to find your location.
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="photo"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Upload Photo</FormLabel>
-                    <FormControl>
-                      <div className="flex items-center gap-2">
-                        <Button type="button" variant="outline" asChild className="cursor-pointer">
-                          <label htmlFor="photo-upload">
-                            <Upload className="mr-2 h-4 w-4" />
-                            Choose File
-                          </label>
-                        </Button>
-                        <Input id="photo-upload" type="file" className="hidden" {...field} />
-                        <span className="text-sm text-muted-foreground">No file chosen</span>
-                      </div>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormItem>
-                <FormLabel>Record Voice Note</FormLabel>
-                <Button type="button" variant="outline" className="w-full justify-start" disabled>
-                  <Mic className="mr-2 h-4 w-4" />
-                  Start Recording (coming soon)
+            <div className="space-y-4">
+              <h3 className="text-lg font-medium">Evidence (Photos)</h3>
+              
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <Upload className="mr-2 h-4 w-4" />
+                  Upload Photos
                 </Button>
+                
+                {navigator.mediaDevices && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <Camera className="mr-2 h-4 w-4" />
+                    Take Photo
+                  </Button>
+                )}
+              </div>
+
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                multiple
+                capture="environment"
+                onChange={handlePhotoUpload}
+                className="hidden"
+              />
+
+              {photos.length > 0 && (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  {photos.map((photo, index) => (
+                    <div key={index} className="relative">
+                      <img
+                        src={URL.createObjectURL(photo)}
+                        alt={`Upload ${index + 1}`}
+                        className="w-full h-24 object-cover rounded-lg"
+                      />
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="sm"
+                        className="absolute -top-2 -right-2 h-6 w-6 rounded-full p-0"
+                        onClick={() => removePhoto(index)}
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              
+              <p className="text-sm text-muted-foreground">
+                Maximum 5 photos. Supported formats: JPG, PNG, WebP<br />
+                <span className="text-xs text-blue-600">
+                  📝 Note: Your issue will be submitted successfully even if photo uploads fail
+                </span>
+              </p>
+            </div>
+
+            <div className="space-y-4">
+              <h3 className="text-lg font-medium">Voice Note (Optional)</h3>
+              <FormItem>
+                <FormDescription>
+                  Record a voice note to provide additional context
+                </FormDescription>
+                <div className="flex gap-2">
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    onClick={isRecording ? stopRecording : startRecording}
+                    disabled={!navigator.mediaDevices}
+                  >
+                    <Mic className={`mr-2 h-4 w-4 ${isRecording ? 'text-red-500' : ''}`} />
+                    {isRecording ? 'Stop Recording' : 'Start Recording'}
+                  </Button>
+                  
+                  {audioBlob && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      onClick={() => setAudioBlob(null)}
+                    >
+                      <X className="mr-2 h-4 w-4" />
+                      Remove
+                    </Button>
+                  )}
+                </div>
+                
+                {audioBlob && (
+                  <div className="p-2 bg-green-50 rounded text-sm text-green-800">
+                    Voice note recorded successfully
+                  </div>
+                )}
               </FormItem>
             </div>
+
+            {uploadProgress > 0 && uploadProgress < 100 && (
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span>Uploading files...</span>
+                  <span>{Math.round(uploadProgress)}%</span>
+                </div>
+                <Progress value={uploadProgress} />
+              </div>
+            )}
             
             <Button type="submit" className="w-full" size="lg" disabled={isSubmitting}>
               {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Submit Complaint
+              Submit Issue Report
             </Button>
           </form>
         </Form>

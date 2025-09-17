@@ -19,23 +19,66 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { MoreHorizontal } from "lucide-react";
-import { mockIssues } from "@/lib/data";
+import { MoreHorizontal, Eye, Edit } from "lucide-react";
 import { StatusBadge } from "../issues/StatusBadge";
 import { format } from 'date-fns';
+import { Skeleton } from "@/components/ui/skeleton";
 
-export function IssueDataTable() {
+interface IssueDataTableProps {
+  issues?: any[];
+  loading?: boolean;
+}
+
+export function IssueDataTable({ issues = [], loading = false }: IssueDataTableProps) {
   const [filter, setFilter] = React.useState("");
-  const filteredIssues = mockIssues.filter(issue => 
-    issue.category.toLowerCase().includes(filter.toLowerCase()) ||
-    issue.location.address.toLowerCase().includes(filter.toLowerCase())
+  
+  const filteredIssues = issues.filter(issue => 
+    issue.title?.toLowerCase().includes(filter.toLowerCase()) ||
+    issue.description?.toLowerCase().includes(filter.toLowerCase()) ||
+    issue.category?.name?.toLowerCase().includes(filter.toLowerCase())
   );
 
+  if (loading) {
+    return (
+      <div className="space-y-4">
+        <Skeleton className="h-10 w-[300px]" />
+        <div className="rounded-md border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>ID</TableHead>
+                <TableHead>Title</TableHead>
+                <TableHead>Category</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Priority</TableHead>
+                <TableHead>Reported</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {[1, 2, 3, 4, 5].map((i) => (
+                <TableRow key={i}>
+                  <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                  <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+                  <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                  <TableCell><Skeleton className="h-6 w-20" /></TableCell>
+                  <TableCell><Skeleton className="h-6 w-16" /></TableCell>
+                  <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                  <TableCell className="text-right"><Skeleton className="h-8 w-8" /></TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div>
+    <div className="space-y-4">
       <div className="flex items-center py-4">
         <Input
-          placeholder="Filter by category or location..."
+          placeholder="Filter by title, category, or description..."
           value={filter}
           onChange={(event) => setFilter(event.target.value)}
           className="max-w-sm"
@@ -46,9 +89,10 @@ export function IssueDataTable() {
           <TableHeader>
             <TableRow>
               <TableHead>ID</TableHead>
+              <TableHead>Title</TableHead>
               <TableHead>Category</TableHead>
               <TableHead>Status</TableHead>
-              <TableHead>Location</TableHead>
+              <TableHead>Priority</TableHead>
               <TableHead>Reported</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
@@ -57,11 +101,31 @@ export function IssueDataTable() {
             {filteredIssues.length ? (
               filteredIssues.map((issue) => (
                 <TableRow key={issue.id}>
-                  <TableCell className="font-mono text-xs">#{issue.id}</TableCell>
-                  <TableCell>{issue.category}</TableCell>
-                  <TableCell><StatusBadge status={issue.status} /></TableCell>
-                  <TableCell>{issue.location.address}</TableCell>
-                  <TableCell>{format(issue.createdAt, 'PP')}</TableCell>
+                  <TableCell className="font-mono text-xs">
+                    #{issue.id.slice(-8)}
+                  </TableCell>
+                  <TableCell className="font-medium">
+                    {issue.title}
+                  </TableCell>
+                  <TableCell>
+                    {issue.category?.name || 'Unknown'}
+                  </TableCell>
+                  <TableCell>
+                    <StatusBadge status={issue.status} />
+                  </TableCell>
+                  <TableCell>
+                    <span className={`px-2 py-1 text-xs rounded-full ${
+                      issue.priority === 'urgent' ? 'bg-red-100 text-red-700' :
+                      issue.priority === 'high' ? 'bg-orange-100 text-orange-700' :
+                      issue.priority === 'medium' ? 'bg-yellow-100 text-yellow-700' :
+                      'bg-green-100 text-green-700'
+                    }`}>
+                      {issue.priority}
+                    </span>
+                  </TableCell>
+                  <TableCell>
+                    {format(new Date(issue.created_at), 'MMM dd, yyyy')}
+                  </TableCell>
                   <TableCell className="text-right">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
@@ -72,12 +136,15 @@ export function IssueDataTable() {
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                        <DropdownMenuItem onClick={() => navigator.clipboard.writeText(issue.id)}>
-                          Copy issue ID
-                        </DropdownMenuItem>
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem>View details</DropdownMenuItem>
-                        <DropdownMenuItem>Update status</DropdownMenuItem>
+                        <DropdownMenuItem>
+                          <Eye className="mr-2 h-4 w-4" />
+                          View Details
+                        </DropdownMenuItem>
+                        <DropdownMenuItem>
+                          <Edit className="mr-2 h-4 w-4" />
+                          Manage Issue
+                        </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>
@@ -85,8 +152,8 @@ export function IssueDataTable() {
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={6} className="h-24 text-center">
-                  No results.
+                <TableCell colSpan={7} className="h-24 text-center">
+                  {filter ? 'No issues match your filter.' : 'No issues found.'}
                 </TableCell>
               </TableRow>
             )}

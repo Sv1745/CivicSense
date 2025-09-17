@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>CivicSense Icon Generator</title>
+</head>
+<body>
+    <canvas id="canvas" width="512" height="512" style="display: none;"></canvas>
+    <script>
+        // Create a simple civic-themed icon
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Background
+        ctx.fillStyle = '#3b82f6';
+        ctx.fillRect(0, 0, 512, 512);
+        
+        // White building outline
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(150, 200, 80, 250);
+        ctx.fillRect(250, 150, 80, 300);
+        ctx.fillRect(350, 180, 80, 270);
+        
+        // Windows
+        ctx.fillStyle = '#3b82f6';
+        ctx.fillRect(165, 230, 15, 20);
+        ctx.fillRect(200, 230, 15, 20);
+        ctx.fillRect(165, 280, 15, 20);
+        ctx.fillRect(200, 280, 15, 20);
+        
+        ctx.fillRect(265, 180, 15, 20);
+        ctx.fillRect(300, 180, 15, 20);
+        ctx.fillRect(265, 230, 15, 20);
+        ctx.fillRect(300, 230, 15, 20);
+        ctx.fillRect(265, 280, 15, 20);
+        ctx.fillRect(300, 280, 15, 20);
+        
+        ctx.fillRect(365, 210, 15, 20);
+        ctx.fillRect(400, 210, 15, 20);
+        ctx.fillRect(365, 260, 15, 20);
+        ctx.fillRect(400, 260, 15, 20);
+        
+        // Create download links for different sizes
+        const sizes = [72, 96, 128, 144, 152, 192, 384, 512];
+        
+        sizes.forEach(size => {
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = size;
+            tempCanvas.height = size;
+            const tempCtx = tempCanvas.getContext('2d');
+            
+            tempCtx.drawImage(canvas, 0, 0, 512, 512, 0, 0, size, size);
+            
+            const link = document.createElement('a');
+            link.download = `icon-${size}x${size}.png`;
+            link.href = tempCanvas.toDataURL();
+            link.textContent = `Download ${size}x${size}`;
+            link.style.display = 'block';
+            link.style.margin = '10px';
+            document.body.appendChild(link);
+        });
+    </script>
+</body>
+</html>
