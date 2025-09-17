@@ -136,8 +136,8 @@ create policy "Users can view own profile" on public.profiles
 create policy "Users can update own profile" on public.profiles
   for update using (auth.uid() = id);
 
-create policy "Enable insert for authenticated users only" on public.profiles
-  for insert with check (auth.role() = 'authenticated');
+create policy "Users can insert their own profile" on public.profiles
+  for insert with check (auth.uid() IS NOT NULL AND auth.uid() = id);
 
 -- Categories: Everyone can read, only admins can modify
 create policy "Anyone can view categories" on public.categories

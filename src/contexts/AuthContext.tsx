@@ -137,6 +137,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .single();
 
       if (error) {
+        if (error.code === 'PGRST116') {
+          // Profile doesn't exist, try to create one
+          console.log('Profile not found, attempting to create...');
+          try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+              const createdProfile = await createUserProfile(
+                user.id, 
+                user.email || '', 
+                user.user_metadata?.full_name || 'User'
+              );
+              if (createdProfile) {
+                setUser(createdProfile as Profile);
+              }
+              return;
+            }
+          } catch (createError) {
+            console.error('Failed to create missing profile:', createError);
+          }
+        }
         console.error('Error fetching user profile:', error);
         setUser(null);
       } else {
@@ -151,6 +171,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const createUserProfile = async (userId: string, email: string, displayName: string) => {
+    // First, let's check if a profile already exists (might have been created by trigger)
+    const { data: existingProfile } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('id', userId)
+      .single();
+    
+    if (existingProfile) {
+      console.log('Profile already exists for user:', userId);
+      return existingProfile;
+    }
+
+    // If no profile exists, try to create one
     const profile: Database['public']['Tables']['profiles']['Insert'] = {
       id: userId,
       email: email,
@@ -160,14 +193,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       updated_at: new Date().toISOString(),
     };
 
-    const { error } = await supabase.from('profiles').insert(profile);
+    // Use upsert instead of insert to handle conflicts
+    const { data, error } = await supabase
+      .from('profiles')
+      .upsert(profile, { onConflict: 'id' })
+      .select()
+      .single();
     
     if (error) {
       console.error('Error creating user profile:', error.message || error);
-      throw new Error(error.message || 'Failed to create user profile');
+      throw new Error(`Error creating user profile: "${error.message || error}"`);
     }
 
-    return profile;
+    return data;
   };
 
   const signUp = async (email: string, password: string, displayName: string) => {
@@ -189,14 +227,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (error) throw error;
     
     if (data.user) {
-      try {
-        await createUserProfile(data.user.id, email, displayName);
-      } catch (profileError) {
-        console.error('Failed to create user profile:', profileError);
-        // The user account was created but profile creation failed
-        // The user can still sign in, but they may need to complete their profile
-        throw new Error('Account created but profile setup incomplete. Please try signing in.');
-      }
+      console.log('✅ User created successfully:', data.user.id);
+      // Profile will be automatically created by the database trigger
+      // No manual profile creation needed
     }
   };
 

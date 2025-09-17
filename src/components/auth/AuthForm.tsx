@@ -12,20 +12,25 @@ import { Separator } from '@/components/ui/separator';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { Eye, EyeOff, Loader2 } from 'lucide-react';
-const loginSchema = z.object({
+// Base schema that includes all possible fields
+const baseSchema = z.object({
+  displayName: z.string().optional(),
   email: z.string().email('Invalid email address'),
   password: z.string().min(6, 'Password must be at least 6 characters'),
+  confirmPassword: z.string().optional(),
 });
 
-const signupSchema = z.object({
-  displayName: z.string().min(2, 'Name must be at least 2 characters'),
-  email: z.string().email('Invalid email address'),
-  password: z.string().min(6, 'Password must be at least 6 characters'),
-  confirmPassword: z.string(),
-}).refine((data) => data.password === data.confirmPassword, {
-  message: "Passwords don't match",
-  path: ["confirmPassword"],
-});
+const loginSchema = baseSchema.refine(() => true);
+
+const signupSchema = baseSchema
+  .refine((data) => data.displayName && data.displayName.length >= 2, {
+    message: 'Name must be at least 2 characters',
+    path: ['displayName'],
+  })
+  .refine((data) => data.confirmPassword && data.password === data.confirmPassword, {
+    message: "Passwords don't match",
+    path: ["confirmPassword"],
+  });
 
 interface AuthFormProps {
   mode: 'login' | 'signup';
@@ -42,27 +47,28 @@ export function AuthForm({ mode, onSwitchMode }: AuthFormProps) {
 
   // Use appropriate schema based on mode
   const schema = isLogin ? loginSchema : signupSchema;
-  const form = useForm<z.infer<typeof schema>>({
+  const form = useForm<z.infer<typeof baseSchema>>({
     resolver: zodResolver(schema),
-    defaultValues: isLogin 
-      ? {
-          email: '',
-          password: '',
-        }
-      : {
-          displayName: '',
-          email: '',
-          password: '',
-          confirmPassword: '',
-        },
+    defaultValues: {
+      displayName: '',
+      email: '',
+      password: '',
+      confirmPassword: '',
+    },
   });
 
-  // Clear form errors when mode changes
+  // Clear form errors and reset unnecessary fields when mode changes
   useEffect(() => {
     form.clearErrors();
-  }, [mode, form]);
+    
+    if (isLogin) {
+      // Clear signup-specific fields when switching to login
+      form.setValue('displayName', '');
+      form.setValue('confirmPassword', '');
+    }
+  }, [mode, form, isLogin]);
 
-  const onSubmit = async (values: z.infer<typeof schema>) => {
+  const onSubmit = async (values: z.infer<typeof baseSchema>) => {
     setLoading(true);
     
     try {
@@ -73,8 +79,11 @@ export function AuthForm({ mode, onSwitchMode }: AuthFormProps) {
           description: 'You have been successfully logged in.',
         });
       } else {
-        const signupValues = values as z.infer<typeof signupSchema>;
-        await signUp(signupValues.email, signupValues.password, signupValues.displayName);
+        // Ensure required signup fields are present
+        if (!values.displayName || !values.confirmPassword) {
+          throw new Error('Missing required fields for signup');
+        }
+        await signUp(values.email, values.password, values.displayName);
         toast({
           title: 'Account created!',
           description: 'Welcome to CivicSense. You can now report issues.',
@@ -191,7 +200,7 @@ export function AuthForm({ mode, onSwitchMode }: AuthFormProps) {
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <div className={isLogin ? 'hidden' : ''}>
+            {!isLogin && (
               <FormField
                 control={form.control}
                 name="displayName"
@@ -205,7 +214,7 @@ export function AuthForm({ mode, onSwitchMode }: AuthFormProps) {
                   </FormItem>
                 )}
               />
-            </div>
+            )}
 
             <FormField
               control={form.control}
@@ -258,7 +267,7 @@ export function AuthForm({ mode, onSwitchMode }: AuthFormProps) {
               )}
             />
 
-            <div className={isLogin ? 'hidden' : ''}>
+            {!isLogin && (
               <FormField
                 control={form.control}
                 name="confirmPassword"
@@ -276,7 +285,7 @@ export function AuthForm({ mode, onSwitchMode }: AuthFormProps) {
                   </FormItem>
                 )}
               />
-            </div>
+            )}
 
             <Button type="submit" className="w-full" disabled={loading}>
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
