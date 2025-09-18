@@ -677,10 +677,10 @@ export function IndianGovDashboard() {
                             <span className="text-green-600 bg-green-50 px-2 py-1 rounded">✓ {dept.resolved} resolved</span>
                             <span className="text-orange-600 bg-orange-50 px-2 py-1 rounded">⏱ {dept.pending} pending</span>
                           </div>
-                          <div className="w-24 h-2 bg-gray-200 rounded-full mt-2">
+                          <div className="w-24 h-2 bg-gray-200 rounded-full mt-2 overflow-hidden">
                             <div 
                               className="h-2 bg-green-500 rounded-full transition-all duration-300"
-                              style={{ width: `${dept.count > 0 ? (dept.resolved / dept.count) * 100 : 0}%` }}
+                              style={{ width: `clamp(0%, ${dept.count > 0 ? (dept.resolved / dept.count) * 100 : 0}%, 100%)` }}
                             />
                           </div>
                         </div>
@@ -722,10 +722,10 @@ export function IndianGovDashboard() {
                         <span className="text-green-600">{state.resolved} resolved</span>
                         <span className="text-orange-600">{state.count - state.resolved} pending</span>
                       </div>
-                      <div className="w-full h-2 bg-gray-200 rounded-full mt-2">
+                      <div className="w-full h-2 bg-gray-200 rounded-full mt-2 overflow-hidden">
                         <div 
                           className="h-2 bg-gradient-to-r from-green-400 to-green-600 rounded-full"
-                          style={{ width: `${(state.resolved / state.count) * 100}%` }}
+                          style={{ width: `clamp(0%, ${(state.resolved / state.count) * 100}%, 100%)` }}
                         />
                       </div>
                     </div>

@@ -34,8 +34,15 @@ interface IssueDataTableProps {
 export function IssueDataTable({ issues = [], loading = false }: IssueDataTableProps) {
   const [filter, setFilter] = React.useState("");
   const [selectedIssue, setSelectedIssue] = React.useState<any | null>(null);
+  // Maintain a local copy of issues so we can update immutably
+  const [localIssues, setLocalIssues] = React.useState<any[]>(issues || []);
+
+  // Sync local copy when prop changes
+  React.useEffect(() => {
+    setLocalIssues(issues || []);
+  }, [issues]);
   
-  const filteredIssues = issues.filter(issue => 
+  const filteredIssues = localIssues.filter(issue => 
     issue.title?.toLowerCase().includes(filter.toLowerCase()) ||
     issue.description?.toLowerCase().includes(filter.toLowerCase()) ||
     issue.category?.name?.toLowerCase().includes(filter.toLowerCase())
@@ -173,9 +180,8 @@ export function IssueDataTable({ issues = [], loading = false }: IssueDataTableP
             <IssueManagementForm
               issue={selectedIssue}
               onUpdate={(updated: any) => {
-                // Update the local issues array
-                const idx = issues.findIndex(i => i.id === updated.id);
-                if (idx !== -1) issues[idx] = updated;
+                // Immutable update of local issues state
+                setLocalIssues(prev => prev.map(i => i.id === updated.id ? updated : i));
                 setSelectedIssue(null);
               }}
             />
