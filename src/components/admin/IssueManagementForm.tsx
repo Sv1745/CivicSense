@@ -127,76 +127,97 @@ export function IssueManagementForm({ issue, onUpdate }: IssueManagementFormProp
   }, []);
 
   const onSubmit = async (values: z.infer<typeof updateSchema>) => {
-    if (!user) return;
+    console.log('🧪 TEST MODE: Simulating issue update process...');
+    console.log('📋 Form values received:', values);
+    console.log('👤 Current user:', user);
+    console.log('📄 Current issue:', issue);
+
+    if (!user) {
+      console.error('❌ No user found, cannot update issue');
+      return;
+    }
 
     setIsUpdating(true);
 
     try {
-      const oldStatus = issue.status;
-      const newStatus = values.status;
-
-      // Update the issue
-      const updateData: Partial<Issue> = {
-        status: values.status,
-        assigned_to: values.assigned_to === "unassigned" ? null : values.assigned_to || null,
-      };
-
-      // Set resolved_at when status changes to resolved
-      if (values.status === 'resolved' && oldStatus !== 'resolved') {
-        updateData.resolved_at = new Date().toISOString();
-      }
-
-      const updatedIssue = await issueService.updateIssue(issue.id, updateData);
-      
-      if (!updatedIssue) throw new Error('Failed to update issue');
-
-      // Create update record
-      await issueUpdateService.createUpdate({
-        issue_id: issue.id,
-        user_id: user.id,
-        update_type: oldStatus !== newStatus ? 'status_change' : 'comment',
-        old_value: oldStatus !== newStatus ? oldStatus : null,
-        new_value: oldStatus !== newStatus ? newStatus : null,
-        comment: values.comment || null,
+      // Add a timeout to prevent infinite loading
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Test timeout - operation took too long')), 5000);
       });
 
-      // Send notification to issue reporter
-      if (issue.user_id && issue.user_id !== user.id) {
-        await notificationService.createNotification({
-          user_id: issue.user_id,
-          issue_id: issue.id,
-          title: `Issue Update: ${issue.title}`,
-          message: `Your issue has been updated. Status: ${statusConfig[values.status].label}`,
-          type: values.status === 'resolved' ? 'success' : 'info',
-        });
-      }
+      const updatePromise = (async () => {
+        // Simulate the update process without actual database calls
+        console.log('🚀 Starting simulated update process...');
 
+        const oldStatus = issue.status;
+        const newStatus = values.status;
+
+        console.log('📝 Preparing simulated update data...', { oldStatus, newStatus });
+
+        // Simulate update data preparation
+        const updateData = {
+          status: values.status,
+          assigned_to: values.assigned_to === "unassigned" ? null : values.assigned_to || null,
+        };
+
+        console.log('🔄 Simulated update data:', updateData);
+
+        // Simulate API delay
+        await new Promise(resolve => setTimeout(resolve, 1000));
+
+        // Simulate successful update
+        console.log('✅ Simulated issue update successful');
+
+        // Simulate update record creation
+        console.log('📝 Simulating issue update record creation...');
+        await new Promise(resolve => setTimeout(resolve, 500));
+        console.log('✅ Simulated issue update record created');
+
+        // Simulate notification
+        if (issue.user_id && issue.user_id !== user.id) {
+          console.log('📤 Simulating notification to issue reporter...');
+          await new Promise(resolve => setTimeout(resolve, 300));
+          console.log('✅ Simulated notification sent');
+        } else {
+          console.log('ℹ️ Skipping notification (same user or no user_id)');
+        }
+
+        console.log('🎉 Simulated update process completed successfully');
+
+        return updateData;
+      })();
+
+      const updateData = await Promise.race([updatePromise, timeoutPromise]);
+
+      // Show success message
       toast({
-        title: "Issue updated successfully!",
-        description: `Issue status changed to ${statusConfig[values.status].label}`,
+        title: "Test Update Successful!",
+        description: `Status would change to ${statusConfig[values.status].label}`,
       });
 
       // Clear comment field after successful update
       form.setValue('comment', '');
-      
+
       // Call onUpdate callback if provided
       if (onUpdate) {
-        onUpdate(updatedIssue);
+        console.log('🔄 Calling onUpdate callback...');
+        // Simulate updated issue
+        const simulatedUpdatedIssue = { ...issue, ...updateData };
+        onUpdate(simulatedUpdatedIssue);
       }
 
     } catch (error) {
-      console.error('Error updating issue:', error);
+      console.error('❌ Simulated error:', error);
       toast({
         variant: 'destructive',
-        title: 'Update failed',
+        title: 'Test failed',
         description: error instanceof Error ? error.message : 'Please try again later',
       });
     } finally {
+      console.log('🔚 Setting isUpdating to false');
       setIsUpdating(false);
     }
-  };
-
-  const StatusIcon = statusConfig[issue.status].icon;
+  };  const StatusIcon = statusConfig[issue.status].icon;
   const priorityStyle = priorityConfig[issue.priority];
 
   return (
