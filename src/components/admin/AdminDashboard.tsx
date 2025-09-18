@@ -24,11 +24,15 @@ export function AdminDashboard() {
   useEffect(() => {
     const loadInitialData = async () => {
       try {
+        console.log('🔎 AdminDashboard: loading initial data...');
         const [issuesData, usersCount] = await Promise.all([
           issueService.getAllIssues(),
           profileService.getUserCount()
         ]);
-        
+
+        console.log(`🔎 AdminDashboard: initial load - received ${issuesData?.length ?? 0} issues and ${usersCount ?? 0} users`);
+        if (issuesData && issuesData.length > 0) console.log('🔎 AdminDashboard: sample issue:', issuesData[0]);
+
         setAllIssues(issuesData || []);
         setTotalUsers(usersCount || 0);
       } catch (error) {

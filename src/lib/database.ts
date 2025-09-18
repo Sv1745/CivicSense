@@ -279,7 +279,10 @@ export const issueService = {
 
   async getAllIssues(): Promise<Issue[]> {
     if (isDemoMode()) {
-      return await demoService.getAllIssues();
+      const demoIssues = await demoService.getAllIssues();
+      console.log('🧪 issueService.getAllIssues: running in DEMO mode, returning', demoIssues.length, 'issues');
+      if (demoIssues.length > 0) console.log('🧪 Sample demo issue:', JSON.stringify(demoIssues[0]));
+      return demoIssues;
     }
     
     try {
@@ -294,19 +297,27 @@ export const issueService = {
         .order('created_at', { ascending: false });
       
       if (error) {
-        console.error('Error fetching all issues:', error);
+        console.error('Error fetching all issues from Supabase:', JSON.stringify(error, null, 2));
         // If table doesn't exist, fallback to demo data
         if (error.code === 'PGRST116' || error.message?.includes('relation') || error.message?.includes('does not exist')) {
           console.log('📋 Issues table not found, falling back to demo data');
-          return await demoService.getAllIssues();
+          const demoIssues = await demoService.getAllIssues();
+          console.log('🧪 issueService.getAllIssues: Supabase table missing, demo fallback used, returning', demoIssues.length, 'issues');
+          if (demoIssues.length > 0) console.log('🧪 Sample demo issue:', JSON.stringify(demoIssues[0]));
+          return demoIssues;
         }
+        console.log('🧪 issueService.getAllIssues: unexpected supabase error, returning empty list');
         return [];
       }
       
+      console.log('✅ issueService.getAllIssues: fetched', (data || []).length, 'issues from Supabase');
+      if (data && data.length > 0) console.log('✅ Sample Supabase issue:', JSON.stringify(data[0]));
       return data || [];
     } catch (err) {
       console.error('Issues fetch failed, using demo data:', err);
-      return await demoService.getAllIssues();
+      const demoIssues = await demoService.getAllIssues();
+      console.log('🧪 issueService.getAllIssues: exception occurred, demo fallback used, returning', demoIssues.length, 'issues');
+      return demoIssues;
     }
   },
 
