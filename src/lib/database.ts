@@ -15,6 +15,8 @@ if (typeof window !== 'undefined' && isDemoMode()) {
   demoService.init();
 }
 
+// Export demo mode checker for UI banner
+export { isDemoMode };
 // Profile operations
 export const profileService = {
   async getProfile(userId: string): Promise<Profile | null> {

@@ -32,6 +32,8 @@ interface IssueDataTableProps {
 }
 
 export function IssueDataTable({ issues = [], loading = false }: IssueDataTableProps) {
+  // Add a prop callback for refresh
+  const [refreshing, setRefreshing] = React.useState(false);
   const [filter, setFilter] = React.useState("");
   const [selectedIssue, setSelectedIssue] = React.useState<any | null>(null);
   // Maintain a local copy of issues so we can update immutably
@@ -179,10 +181,20 @@ export function IssueDataTable({ issues = [], loading = false }: IssueDataTableP
           {selectedIssue && (
             <IssueManagementForm
               issue={selectedIssue}
-              onUpdate={(updated: any) => {
+              onUpdate={async (updated: any) => {
                 // Immutable update of local issues state
                 setLocalIssues(prev => prev.map(i => i.id === updated.id ? updated : i));
                 setSelectedIssue(null);
+                // After update, trigger a refresh from DB for dynamic update
+                setRefreshing(true);
+                try {
+                  const freshIssues = await import('@/lib/database').then(mod => mod.issueService.getAllIssues());
+                  setLocalIssues(freshIssues || []);
+                } catch (err) {
+                  console.error('Failed to refresh issues after update:', err);
+                } finally {
+                  setRefreshing(false);
+                }
               }}
             />
           )}

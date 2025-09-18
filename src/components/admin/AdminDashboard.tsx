@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { AnalyticsCharts } from "./AnalyticsCharts";
 import { IssueDataTable } from "./IssueDataTable";
 import { useIssueChanges, useNotifications } from "@/hooks/useRealtime";
-import { issueService, profileService } from "@/lib/database";
+import { issueService, profileService, isDemoMode } from "@/lib/database";
 import { useAuth } from "@/contexts/AuthContext";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -67,8 +67,14 @@ export function AdminDashboard() {
     }
   };
 
+  const [demoBanner, setDemoBanner] = useState<string>("");
+  useEffect(() => {
+    setDemoBanner(isDemoMode() ? "DEMO MODE: Showing sample data only" : "SUPABASE MODE: Showing live database data");
+  }, []);
+
   return (
     <div className="p-4 sm:p-6 lg:p-8 space-y-6">
+      <div className={`mb-4 px-4 py-2 rounded text-sm font-semibold ${isDemoMode() ? 'bg-yellow-100 text-yellow-800 border border-yellow-300' : 'bg-green-100 text-green-800 border border-green-300'}`}>{demoBanner}</div>
       <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight font-headline">Admin Dashboard</h1>
