@@ -8,6 +8,7 @@ import { AnalyticsCharts } from "./AnalyticsCharts";
 import { IssueDataTable } from "./IssueDataTable";
 import { useIssueChanges, useNotifications } from "@/hooks/useRealtime";
 import { issueService, profileService, isDemoMode } from "@/lib/database";
+import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -35,16 +36,29 @@ export function AdminDashboard() {
     const loadInitialData = async () => {
       try {
         console.log('🔎 AdminDashboard: loading initial data...');
-        const [issuesData, usersCount] = await Promise.all([
+        
+        // Test issues fetch specifically
+        console.log('🔎 AdminDashboard: Fetching issues...');
+        const issuesData = await issueService.getAllIssues();
+        console.log('🔎 AdminDashboard: Issues data received:', issuesData);
+        console.log('🔎 AdminDashboard: Issues data type:', typeof issuesData);
+        console.log('🔎 AdminDashboard: Issues data length:', issuesData?.length ?? 'undefined');
+        
+        // Test users count
+        console.log('🔎 AdminDashboard: Fetching users count...');
+        const usersCount = await profileService.getUserCount();
+        console.log('🔎 AdminDashboard: Users count received:', usersCount);
+
+        const [issuesData2, usersCount2] = await Promise.all([
           issueService.getAllIssues(),
           profileService.getUserCount()
         ]);
 
-        console.log(`🔎 AdminDashboard: initial load - received ${issuesData?.length ?? 0} issues and ${usersCount ?? 0} users`);
-        if (issuesData && issuesData.length > 0) console.log('🔎 AdminDashboard: sample issue:', issuesData[0]);
+        console.log(`🔎 AdminDashboard: initial load - received ${issuesData2?.length ?? 0} issues and ${usersCount2 ?? 0} users`);
+        if (issuesData2 && issuesData2.length > 0) console.log('🔎 AdminDashboard: sample issue:', issuesData2[0]);
 
-        setAllIssues(issuesData || []);
-        setTotalUsers(usersCount || 0);
+        setAllIssues(issuesData2 || []);
+        setTotalUsers(usersCount2 || 0);
         
         // Update debug info
         setDebugInfo(prev => ({
@@ -67,14 +81,23 @@ export function AdminDashboard() {
 
   // Update debug info when user changes
   useEffect(() => {
-    if (user) {
-      setDebugInfo(prev => ({
-        ...prev,
-        userId: user.id,
-        userEmail: user.email || '',
-        userRole: user.user_metadata?.role || 'unknown'
-      }));
-    }
+    const updateUserInfo = async () => {
+      if (user) {
+        console.log('🔎 AdminDashboard: User object:', user);
+        
+        // The user object from useAuth should already have the role from the profile
+        const userRole = user.role || 'unknown';
+        
+        setDebugInfo(prev => ({
+          ...prev,
+          userId: user.id,
+          userEmail: user.email || '',
+          userRole: userRole
+        }));
+      }
+    };
+    
+    updateUserInfo();
   }, [user]);
 
   // Update debug info on mount
@@ -204,6 +227,28 @@ export function AdminDashboard() {
             >
               <RefreshCw className={`mr-2 h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`}/>
               Manual Refresh
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={async () => {
+                console.log('🧪 Testing Supabase connection...');
+                try {
+                  const { data, error } = await supabase.from('issues').select('count').limit(1);
+                  if (error) {
+                    console.error('🧪 Supabase connection error:', error);
+                    alert(`Supabase error: ${error.message}`);
+                  } else {
+                    console.log('🧪 Supabase connection successful:', data);
+                    alert('Supabase connection successful');
+                  }
+                } catch (error) {
+                  console.error('🧪 Supabase connection failed:', error);
+                  alert(`Supabase connection failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+                }
+              }}
+            >
+              Test Supabase Connection
             </Button>
           </div>
         </CardContent>
