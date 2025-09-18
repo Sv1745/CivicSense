@@ -1,4 +1,4 @@
-# **App Name**: CivicConnect
+# **App Name**: CivicNetra
 
 ## Core Features:
 

@@ -24,7 +24,7 @@ export default function Home() {
                     Raise Your Voice, Better Your Neighbourhood
                   </h1>
                   <p className="max-w-[600px] text-foreground/80 md:text-xl">
-                    CivicConnect helps you report local issues like potholes, water-logging, or waste management directly to your municipal corporation.
+                    CivicNetra helps you report local issues like potholes, water-logging, or waste management directly to your municipal corporation.
                   </p>
                 </div>
                 <div className="flex flex-col gap-2 min-[400px]:flex-row">
@@ -100,7 +100,7 @@ export default function Home() {
         </section>
       </main>
        <footer className="flex flex-col gap-2 sm:flex-row py-6 w-full shrink-0 items-center px-4 md:px-6 border-t">
-        <p className="text-xs text-muted-foreground">&copy; 2024 CivicConnect India. All rights reserved.</p>
+        <p className="text-xs text-muted-foreground">&copy; 2024 CivicNetra India. All rights reserved.</p>
         <nav className="sm:ml-auto flex gap-4 sm:gap-6">
           <Link href="#" className="text-xs hover:underline underline-offset-4">
             Terms of Service

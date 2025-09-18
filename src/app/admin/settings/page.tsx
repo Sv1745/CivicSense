@@ -22,7 +22,7 @@ export default function AdminSettingsPage() {
             </div>
             <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
-                <Input id="email" type="email" defaultValue="admin@civicconnect.app" />
+                <Input id="email" type="email" defaultValue="admin@CivicNetra.app" />
             </div>
         </CardContent>
       </Card>

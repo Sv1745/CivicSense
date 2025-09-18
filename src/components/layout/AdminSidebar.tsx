@@ -29,7 +29,7 @@ export function AdminSidebar() {
       <SidebarHeader>
         <div className="flex items-center gap-2">
             <Bug className="h-6 w-6 text-primary" />
-            <span className="font-bold text-lg">CivicConnect</span>
+            <span className="font-bold text-lg">CivicNetra</span>
             <SidebarTrigger className="ml-auto" />
         </div>
       </SidebarHeader>
