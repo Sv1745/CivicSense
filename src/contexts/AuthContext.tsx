@@ -297,18 +297,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    // Use dynamic redirect URL based on current domain
-    const currentOrigin = typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBLIC_APP_URL;
+    // Get the current domain dynamically
+    let currentOrigin: string;
+    if (typeof window !== 'undefined') {
+      currentOrigin = window.location.origin;
+    } else {
+      // Fallback for server-side rendering
+      currentOrigin = process.env.VERCEL_URL
+        ? `https://${process.env.VERCEL_URL}`
+        : (process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000');
+    }
+
     const redirectTo = `${currentOrigin}/auth/callback`;
+    console.log('🔗 Google OAuth redirect URL:', redirectTo);
 
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo
+        redirectTo,
+        queryParams: {
+          access_type: 'offline',
+          prompt: 'consent'
+        }
       }
     });
 
-    if (error) throw error;
+    if (error) {
+      console.error('❌ Google sign-in error:', error);
+      throw error;
+    }
   };
 
   const logout = async () => {
@@ -355,8 +372,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
+    // Get the current domain dynamically
+    let currentOrigin: string;
+    if (typeof window !== 'undefined') {
+      currentOrigin = window.location.origin;
+    } else {
+      // Fallback for server-side rendering
+      currentOrigin = process.env.VERCEL_URL
+        ? `https://${process.env.VERCEL_URL}`
+        : (process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000');
+    }
+
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/reset-password`
+      redirectTo: `${currentOrigin}/auth/reset-password`
     });
 
     if (error) throw error;
