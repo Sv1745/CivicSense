@@ -20,16 +20,6 @@ export function AdminDashboard() {
   const [allIssues, setAllIssues] = useState<any[]>([]);
   const [totalUsers, setTotalUsers] = useState(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [debugInfo, setDebugInfo] = useState({
-    userId: '',
-    userEmail: '',
-    userRole: '',
-    demoMode: false,
-    supabaseUrl: '',
-    supabaseKey: '',
-    fetchError: '',
-    lastFetchTime: ''
-  });
 
   // Load initial data
   useEffect(() => {
@@ -59,20 +49,8 @@ export function AdminDashboard() {
 
         setAllIssues(issuesData2 || []);
         setTotalUsers(usersCount2 || 0);
-        
-        // Update debug info
-        setDebugInfo(prev => ({
-          ...prev,
-          fetchError: '',
-          lastFetchTime: new Date().toLocaleString()
-        }));
       } catch (error) {
         console.error('Failed to load initial data:', error);
-        setDebugInfo(prev => ({
-          ...prev,
-          fetchError: error instanceof Error ? error.message : 'Unknown error',
-          lastFetchTime: new Date().toLocaleString()
-        }));
       }
     };
 
@@ -87,13 +65,6 @@ export function AdminDashboard() {
         
         // The user object from useAuth should already have the role from the profile
         const userRole = user.role || 'unknown';
-        
-        setDebugInfo(prev => ({
-          ...prev,
-          userId: user.id,
-          userEmail: user.email || '',
-          userRole: userRole
-        }));
       }
     };
     
@@ -102,20 +73,17 @@ export function AdminDashboard() {
 
   // Update debug info on mount
   useEffect(() => {
-    setDebugInfo(prev => ({
-      ...prev,
-      demoMode: isDemoMode(),
-      supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL ? `${process.env.NEXT_PUBLIC_SUPABASE_URL.substring(0, 20)}...` : 'Not set',
-      supabaseKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ? `${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY.substring(0, 10)}...` : 'Not set'
-    }));
+    // No longer needed - debug info removed
   }, []);
 
-  // Update all issues when real-time changes come in
+  // Update all issues when real-time changes come in (only for updates, not initial load)
   useEffect(() => {
-    if (issues.length > 0) {
+    // Only update if we already have issues loaded AND real-time hook has data
+    if (allIssues.length > 0 && issues.length > 0) {
+      console.log('🔄 AdminDashboard: Updating issues from real-time changes');
       setAllIssues(issues);
     }
-  }, [issues]);
+  }, [issues, allIssues.length]);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
@@ -127,19 +95,8 @@ export function AdminDashboard() {
       
       setAllIssues(issuesData || []);
       setTotalUsers(usersCount || 0);
-      
-      setDebugInfo(prev => ({
-        ...prev,
-        fetchError: '',
-        lastFetchTime: new Date().toLocaleString()
-      }));
     } catch (error) {
       console.error('Failed to refresh data:', error);
-      setDebugInfo(prev => ({
-        ...prev,
-        fetchError: error instanceof Error ? error.message : 'Unknown error',
-        lastFetchTime: new Date().toLocaleString()
-      }));
     } finally {
       setIsRefreshing(false);
     }
@@ -154,105 +111,6 @@ export function AdminDashboard() {
     <div className="p-4 sm:p-6 lg:p-8 space-y-6">
       <div className={`mb-4 px-4 py-2 rounded text-sm font-semibold ${isDemoMode() ? 'bg-yellow-100 text-yellow-800 border border-yellow-300' : 'bg-green-100 text-green-800 border border-green-300'}`}>{demoBanner}</div>
       
-      {/* Debug Information */}
-      <Card className="border-orange-200 bg-orange-50">
-        <CardHeader>
-          <CardTitle className="text-orange-800 flex items-center gap-2">
-            <AlertTriangle className="h-5 w-5" />
-            Debug Information
-          </CardTitle>
-          <CardDescription>
-            Troubleshooting data for admin dashboard issues
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-            <div>
-              <strong>User Info:</strong>
-              <div>ID: {debugInfo.userId || 'Not logged in'}</div>
-              <div>Email: {debugInfo.userEmail || 'N/A'}</div>
-              <div>Role: {debugInfo.userRole || 'N/A'}</div>
-            </div>
-            <div>
-              <strong>Environment:</strong>
-              <div>Demo Mode: {debugInfo.demoMode ? 'YES' : 'NO'}</div>
-              <div>Supabase URL: {debugInfo.supabaseUrl}</div>
-              <div>Supabase Key: {debugInfo.supabaseKey}</div>
-            </div>
-            <div>
-              <strong>Data Status:</strong>
-              <div>Issues Fetched: {allIssues.length}</div>
-              <div>Users Count: {totalUsers}</div>
-              <div>Last Fetch: {debugInfo.lastFetchTime}</div>
-            </div>
-            <div>
-              <strong>Errors:</strong>
-              <div className="text-red-600">{debugInfo.fetchError || 'None'}</div>
-            </div>
-          </div>
-          <div className="flex gap-2">
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={async () => {
-                setIsRefreshing(true);
-                try {
-                  console.log('🔄 Manual refresh triggered...');
-                  const [issuesData, usersCount] = await Promise.all([
-                    issueService.getAllIssues(),
-                    profileService.getUserCount()
-                  ]);
-                  
-                  console.log(`🔄 Manual refresh - received ${issuesData?.length ?? 0} issues and ${usersCount ?? 0} users`);
-                  setAllIssues(issuesData || []);
-                  setTotalUsers(usersCount || 0);
-                  
-                  setDebugInfo(prev => ({
-                    ...prev,
-                    fetchError: '',
-                    lastFetchTime: new Date().toLocaleString()
-                  }));
-                } catch (error) {
-                  console.error('Manual refresh failed:', error);
-                  setDebugInfo(prev => ({
-                    ...prev,
-                    fetchError: error instanceof Error ? error.message : 'Unknown error',
-                    lastFetchTime: new Date().toLocaleString()
-                  }));
-                } finally {
-                  setIsRefreshing(false);
-                }
-              }}
-              disabled={isRefreshing}
-            >
-              <RefreshCw className={`mr-2 h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`}/>
-              Manual Refresh
-            </Button>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={async () => {
-                console.log('🧪 Testing Supabase connection...');
-                try {
-                  const { data, error } = await supabase.from('issues').select('count').limit(1);
-                  if (error) {
-                    console.error('🧪 Supabase connection error:', error);
-                    alert(`Supabase error: ${error.message}`);
-                  } else {
-                    console.log('🧪 Supabase connection successful:', data);
-                    alert('Supabase connection successful');
-                  }
-                } catch (error) {
-                  console.error('🧪 Supabase connection failed:', error);
-                  alert(`Supabase connection failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
-                }
-              }}
-            >
-              Test Supabase Connection
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
       <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight font-headline">Admin Dashboard</h1>

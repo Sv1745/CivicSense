@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { DatabaseSeeder } from '@/components/admin/DatabaseSeeder';
 import { SupabaseConnectionTest } from '@/components/debug/SupabaseConnectionTest';
 import { StorageDiagnostics } from '@/components/debug/StorageDiagnostics';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { 
   FileText, 
   Clock, 
@@ -33,12 +34,14 @@ import {
   TreePine,
   GraduationCap,
   Heart,
-  Scale
+  Scale,
+  Edit
 } from 'lucide-react';
 import type { Database } from '@/lib/database.types';
 import { issueService, departmentService, categoryService, profileService } from '@/lib/database';
 import { StatusBadge } from '@/components/issues/StatusBadge';
 import { useAuth } from '@/contexts/AuthContext';
+import { IssueManagementForm } from '@/components/admin/IssueManagementForm';
 
 type Tables = Database['public']['Tables'];
 type Profile = Tables['profiles']['Row'];
@@ -322,6 +325,7 @@ export function IndianGovDashboard() {
   const [loading, setLoading] = useState(true);
   const [selectedTimeRange, setSelectedTimeRange] = useState('30d');
   const [selectedState, setSelectedState] = useState('all');
+  const [selectedIssue, setSelectedIssue] = useState<any | null>(null);
 
   const fetchStats = async () => {
     try {
@@ -794,6 +798,15 @@ export function IndianGovDashboard() {
                       </div>
                       <div className="flex items-center space-x-3">
                         <StatusBadge status={mapStatus(issue.status)} />
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="hover:bg-blue-50"
+                          onClick={() => setSelectedIssue(issue)}
+                        >
+                          <Edit className="w-4 h-4 mr-1" />
+                          Update
+                        </Button>
                         <Button variant="outline" size="sm" className="hover:bg-blue-50">
                           <Eye className="w-4 h-4" />
                         </Button>
@@ -887,6 +900,26 @@ export function IndianGovDashboard() {
             </Card>
           </TabsContent>
         </Tabs>
+
+        {/* Issue Management Dialog */}
+        {selectedIssue && (
+          <Dialog open={!!selectedIssue} onOpenChange={(open) => { if (!open) setSelectedIssue(null); }}>
+            <DialogContent className="sm:max-w-[800px]">
+              <DialogHeader>
+                <DialogTitle>Manage Issue</DialogTitle>
+              </DialogHeader>
+              <IssueManagementForm
+                issue={selectedIssue}
+                onUpdate={(updated: any) => {
+                  console.log('Issue updated:', updated);
+                  setSelectedIssue(null);
+                  // Refresh the stats after update
+                  fetchStats();
+                }}
+              />
+            </DialogContent>
+          </Dialog>
+        )}
 
         {/* Government of India Footer */}
         <Card className="bg-gradient-to-r from-orange-500 to-green-600 text-white border-0">

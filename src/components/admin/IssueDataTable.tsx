@@ -41,6 +41,12 @@ export function IssueDataTable({ issues = [], loading = false }: IssueDataTableP
 
   // Sync local copy when prop changes
   React.useEffect(() => {
+    console.log('🔍 IssueDataTable: Received issues prop:', issues);
+    console.log('🔍 IssueDataTable: Issues length:', issues?.length ?? 'undefined');
+    console.log('🔍 IssueDataTable: Issues type:', typeof issues);
+    if (issues && issues.length > 0) {
+      console.log('🔍 IssueDataTable: First issue:', issues[0]);
+    }
     setLocalIssues(issues || []);
   }, [issues]);
   
@@ -49,6 +55,10 @@ export function IssueDataTable({ issues = [], loading = false }: IssueDataTableP
     issue.description?.toLowerCase().includes(filter.toLowerCase()) ||
     issue.category?.name?.toLowerCase().includes(filter.toLowerCase())
   );
+
+  console.log('🔍 IssueDataTable: localIssues length:', localIssues.length);
+  console.log('🔍 IssueDataTable: filteredIssues length:', filteredIssues.length);
+  console.log('🔍 IssueDataTable: loading:', loading);
 
   if (loading) {
     return (
