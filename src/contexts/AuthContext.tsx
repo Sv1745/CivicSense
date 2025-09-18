@@ -308,7 +308,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         : (process.env.NEXT_PUBLIC_APP_URL || 'https://civicsensesih.vercel.app/');
     }
 
-    const redirectTo = `${currentOrigin}/auth/callback`;
+  // Redirect back to root so client-side Supabase can finish the PKCE exchange
+  const redirectTo = `${currentOrigin}`;
     console.log('🔗 Google OAuth redirect URL:', redirectTo);
 
     const { error } = await supabase.auth.signInWithOAuth({
