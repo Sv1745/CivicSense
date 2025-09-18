@@ -329,19 +329,41 @@ export const issueService = {
         .single();
       
       if (error) {
-        console.error('Error updating issue:', error);
+        console.error('❌ Error updating issue:', {
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          issueId,
+          updates
+        });
+        
         // If table doesn't exist, fallback to demo data
         if (error.code === 'PGRST116' || error.message?.includes('relation') || error.message?.includes('does not exist')) {
           console.log('📋 Issues table not found, falling back to demo data');
           return await demoService.updateIssue(issueId, updates);
         }
-        throw error;
+        
+        // Throw a more detailed error
+        throw new Error(`Failed to update issue: ${error.message || 'Unknown database error'}`);
       }
       
       return data;
     } catch (err) {
-      console.error('Issue update failed, using demo data:', err);
-      return await demoService.updateIssue(issueId, updates);
+      console.error('❌ Issue update failed:', {
+        error: err,
+        issueId,
+        updates,
+        errorMessage: err instanceof Error ? err.message : 'Unknown error'
+      });
+      
+      // Try demo fallback for any error
+      try {
+        return await demoService.updateIssue(issueId, updates);
+      } catch (demoError) {
+        console.error('❌ Demo fallback also failed:', demoError);
+        throw err; // Re-throw the original error
+      }
     }
   },
 

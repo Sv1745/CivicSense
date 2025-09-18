@@ -3,7 +3,7 @@ import { UploadCloud, Check, LoaderCircle, CheckCheck, XCircle } from "lucide-re
 import type { LucideProps } from "lucide-react";
 import * as React from "react";
 
-type IssueStatus = 'submitted' | 'acknowledged' | 'in_progress' | 'resolved' | 'rejected';
+type IssueStatus = 'submitted' | 'acknowledged' | 'in_progress' | 'resolved' | 'rejected' | 'closed';
 
 type StatusBadgeProps = {
   status: IssueStatus;
@@ -21,6 +21,7 @@ export function StatusBadge({ status, className }: StatusBadgeProps) {
     in_progress: { variant: 'default', Icon: LoaderCircle, label: 'In Progress' },
     resolved: { variant: 'secondary', Icon: CheckCheck, label: 'Resolved' },
     rejected: { variant: 'destructive', Icon: XCircle, label: 'Rejected' },
+    closed: { variant: 'secondary', Icon: CheckCheck, label: 'Closed' },
   };
   
   const statusInfo = statusMap[status];

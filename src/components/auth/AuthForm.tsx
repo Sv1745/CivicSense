@@ -102,13 +102,10 @@ export function AuthForm({ mode, onSwitchMode }: AuthFormProps) {
 
   const handleGoogleSignIn = async () => {
     setLoading(true);
-    
+
     try {
       await signInWithGoogle();
-      toast({
-        title: 'Welcome!',
-        description: 'You have been successfully signed in with Google.',
-      });
+      // Remove premature success toast - auth completion will be handled by AuthContext
     } catch (error: any) {
       toast({
         title: 'Error',

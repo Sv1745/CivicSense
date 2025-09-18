@@ -68,6 +68,7 @@ export function IssueReportForm() {
   const [filteredDepartments, setFilteredDepartments] = useState<Department[]>([]);
   const [isRecording, setIsRecording] = useState(false);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
+  const [isLoadingData, setIsLoadingData] = useState(true);
   
   const { toast } = useToast();
   const { user } = useAuth();
@@ -109,6 +110,7 @@ export function IssueReportForm() {
   useEffect(() => {
     const loadData = async () => {
       try {
+        setIsLoadingData(true);
         const [categoriesData, departmentsData] = await Promise.all([
           categoryService.getCategories(),
           departmentService.getDepartments()
@@ -116,6 +118,7 @@ export function IssueReportForm() {
         
         setCategories(categoriesData);
         setDepartments(departmentsData);
+        setFilteredDepartments(departmentsData);
       } catch (error) {
         console.error('Error loading form data:', error);
         toast({
@@ -123,6 +126,8 @@ export function IssueReportForm() {
           title: 'Error loading form data',
           description: 'Please refresh the page and try again.',
         });
+      } finally {
+        setIsLoadingData(false);
       }
     };
 
@@ -304,66 +309,99 @@ export function IssueReportForm() {
   const uploadFiles = async (userId: string): Promise<string[]> => {
     if (photos.length === 0) return [];
 
+    console.log(`📤 Starting upload of ${photos.length} photos...`);
+    
     const uploadPromises = photos.map(async (photo, index) => {
       try {
+        console.log(`📤 Uploading photo ${index + 1}/${photos.length}: ${photo.name}`);
         const publicUrl = await storageService.uploadIssuePhoto(
           photo, 
           userId, 
           (progress) => {
             // Update progress for this specific photo
-            const baseProgress = 25;
-            const photoProgress = Math.floor((progress / 100) * (50 / photos.length));
-            const totalProgress = baseProgress + (index * (50 / photos.length)) + photoProgress;
-            setUploadProgress(Math.min(totalProgress, 75));
+            const baseProgress = 30; // Start after issue creation (30%)
+            const maxPhotoProgress = 50; // Photos can contribute up to 50% of total progress
+            const photoProgress = Math.floor((progress / 100) * (maxPhotoProgress / photos.length));
+            const totalProgress = baseProgress + (index * (maxPhotoProgress / photos.length)) + photoProgress;
+            setUploadProgress(Math.min(totalProgress, 80));
           }
         );
+        console.log(`✅ Photo ${index + 1} uploaded successfully: ${publicUrl}`);
         return publicUrl;
       } catch (error) {
-        console.error(`Error uploading photo ${index + 1}:`, error);
+        console.error(`❌ Error uploading photo ${index + 1}:`, error);
         // Return null for failed uploads but don't stop the entire process
         return null;
       }
     });
 
-    const photoUrls = await Promise.all(uploadPromises);
-    
-    // Filter out failed uploads and show warning if any failed
-    const successfulUrls = photoUrls.filter(url => url !== null) as string[];
-    const failedCount = photoUrls.length - successfulUrls.length;
-    
-    if (failedCount > 0 && successfulUrls.length > 0) {
+    try {
+      const photoUrls = await Promise.all(uploadPromises);
+      
+      // Filter out failed uploads and show warning if any failed
+      const successfulUrls = photoUrls.filter(url => url !== null) as string[];
+      const failedCount = photoUrls.length - successfulUrls.length;
+      
+      console.log(`📊 Upload results: ${successfulUrls.length} successful, ${failedCount} failed`);
+      
+      if (failedCount > 0) {
+        if (successfulUrls.length > 0) {
+          toast({
+            variant: 'default',
+            title: 'Some photos uploaded',
+            description: `${successfulUrls.length} out of ${photoUrls.length} photos uploaded successfully.`,
+          });
+        } else {
+          toast({
+            variant: 'default',
+            title: 'Photo upload failed',
+            description: 'Your issue was submitted successfully, but photos could not be uploaded.',
+          });
+        }
+      }
+      
+      return successfulUrls;
+      
+    } catch (error) {
+      console.error('❌ Photo upload process failed:', error);
       toast({
-        variant: 'default', // Changed to default instead of destructive
-        title: 'Some photos uploaded',
-        description: `${successfulUrls.length} out of ${photoUrls.length} photos uploaded successfully.`,
+        variant: 'default',
+        title: 'Photo upload failed',
+        description: 'Your issue was submitted successfully, but photos could not be uploaded.',
       });
+      return [];
     }
-    
-    return successfulUrls;
   };
 
   const uploadVoiceNote = async (userId: string): Promise<string | null> => {
     if (!audioBlob) return null;
 
     try {
+      console.log('📤 Starting voice note upload...');
       const fileName = `voice_note_${Date.now()}.wav`;
       const file = new File([audioBlob], fileName, { type: 'audio/wav' });
       
-      return await storageService.uploadIssueAudio(
+      const voiceUrl = await storageService.uploadIssueAudio(
         file, 
         userId,
         (progress) => {
-          // Voice note upload contributes to the final 25% of progress
-          const voiceProgress = Math.floor((progress / 100) * 15);
+          // Voice note upload contributes to the final part of progress (75-80%)
+          const voiceProgress = Math.floor((progress / 100) * 5);
           setUploadProgress(75 + voiceProgress);
         }
       );
+      
+      if (voiceUrl) {
+        console.log('✅ Voice note uploaded successfully:', voiceUrl);
+      }
+      
+      return voiceUrl;
     } catch (error) {
-      console.error('Error uploading voice note:', error);
+      console.error('❌ Error uploading voice note:', error);
       toast({
-        variant: 'destructive',
+        variant: 'default',
         title: 'Voice note upload failed',
-        description: 'The voice note could not be uploaded, but your issue will still be submitted.',
+        description: 'Your issue was submitted successfully, but the voice note could not be uploaded.',
       });
       return null;
     }
@@ -418,7 +456,7 @@ export function IssueReportForm() {
       const issue = await Promise.race([issueCreationPromise, timeoutPromise]) as Database['public']['Tables']['issues']['Row'];
       if (!issue || !issue.id) throw new Error('Failed to create issue - no issue returned from service');
 
-      setUploadProgress(20);
+      setUploadProgress(30); // Issue created successfully
 
       // Try to upload files (don't let upload failures block issue creation)
       let photoUrls: string[] = [];
@@ -426,21 +464,53 @@ export function IssueReportForm() {
 
       // Only attempt uploads if we have files to upload
       if (photos.length > 0 || audioBlob) {
+        console.log(`📤 Attempting to upload: ${photos.length} photos, ${audioBlob ? '1 voice note' : '0 voice notes'}`);
+        
         try {
           console.log('📤 Starting file uploads...');
-          [photoUrls, voiceNoteUrl] = await Promise.all([
+          
+          // Upload photos and voice note in parallel
+          const [photoResults, voiceResult] = await Promise.allSettled([
             photos.length > 0 ? uploadFiles(user.id) : Promise.resolve([]),
             audioBlob ? uploadVoiceNote(user.id) : Promise.resolve(null)
           ]);
-          console.log('✅ File uploads completed');
+
+          // Process photo upload results
+          if (photoResults.status === 'fulfilled') {
+            photoUrls = photoResults.value;
+            console.log(`✅ Photo uploads completed: ${photoUrls.length} successful`);
+          } else {
+            console.warn('❌ Photo upload failed:', photoResults.reason);
+            toast({
+              variant: 'default',
+              title: 'Photo upload failed',
+              description: 'Your issue was submitted successfully, but photos could not be uploaded.',
+            });
+          }
+
+          // Process voice note results
+          if (voiceResult.status === 'fulfilled') {
+            voiceNoteUrl = voiceResult.value;
+            if (voiceNoteUrl) {
+              console.log('✅ Voice note upload completed');
+            } else {
+              console.log('ℹ️ No voice note to upload or upload failed');
+            }
+          } else {
+            console.warn('❌ Voice note upload failed:', voiceResult.reason);
+          }
+
+          setUploadProgress(80); // File uploads attempted
+          
         } catch (uploadError) {
-          console.error('Upload error (continuing anyway):', uploadError);
+          console.error('❌ Upload error (continuing anyway):', uploadError);
+          setUploadProgress(80); // Continue even if uploads fail
           
           // Show specific error message but don't fail the whole submission
           if (uploadError instanceof Error) {
             if (uploadError.message.includes('Storage not available')) {
               toast({
-                variant: 'default', // Changed from destructive to default
+                variant: 'default',
                 title: 'Files not uploaded',
                 description: 'Your issue was submitted successfully, but attachments could not be uploaded due to storage configuration.',
               });
@@ -459,16 +529,26 @@ export function IssueReportForm() {
             }
           }
         }
+      } else {
+        // No files to upload, skip directly to 80%
+        console.log('ℹ️ No files to upload, skipping upload phase');
+        setUploadProgress(80);
       }
 
       setUploadProgress(90);
 
       // Update issue with file URLs (only if we have successful uploads)
       if (photoUrls.length > 0 || voiceNoteUrl) {
-        await issueService.updateIssue(issue.id, {
-          photo_urls: photoUrls,
-          audio_url: voiceNoteUrl
-        });
+        try {
+          await issueService.updateIssue(issue.id, {
+            photo_urls: photoUrls,
+            audio_url: voiceNoteUrl
+          });
+          console.log('✅ Issue updated with file URLs');
+        } catch (updateError) {
+          console.warn('Failed to update issue with file URLs, but issue was created:', updateError);
+          // Don't fail the submission if we can't update file URLs
+        }
       }
 
       setUploadProgress(100);
@@ -513,8 +593,14 @@ export function IssueReportForm() {
         </p>
       </CardHeader>
       <CardContent className="p-6">
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+        {isLoadingData ? (
+          <div className="flex flex-col items-center justify-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
+            <p className="text-muted-foreground">Loading form data...</p>
+          </div>
+        ) : (
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
             
             <FormField
               control={form.control}
@@ -838,10 +924,18 @@ export function IssueReportForm() {
             {uploadProgress > 0 && uploadProgress < 100 && (
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
-                  <span>Uploading files...</span>
+                  <span>
+                    {uploadProgress <= 30 ? 'Creating issue...' :
+                     uploadProgress <= 80 ? 'Uploading files...' :
+                     uploadProgress <= 90 ? 'Finalizing...' :
+                     'Almost done...'}
+                  </span>
                   <span>{Math.round(uploadProgress)}%</span>
                 </div>
                 <Progress value={uploadProgress} />
+                <div className="text-xs text-muted-foreground text-center">
+                  Your issue will be submitted successfully even if file uploads fail
+                </div>
               </div>
             )}
             
@@ -851,6 +945,7 @@ export function IssueReportForm() {
             </Button>
           </form>
         </Form>
+        )}
       </CardContent>
     </Card>
   );

@@ -5,27 +5,52 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { 
-  Clock, 
-  CheckCircle, 
-  AlertCircle, 
-  MapPin, 
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import {
+  Clock,
+  CheckCircle,
+  AlertCircle,
+  MapPin,
   Eye,
   ThumbsUp,
   MessageCircle,
-  Loader2 
+  Loader2,
+  Edit,
+  Save,
+  X
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { IssueReport } from '@/lib/types';
-import { db } from '@/lib/firebase';
-import { collection, query, where, orderBy, onSnapshot, doc, updateDoc, arrayUnion } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { StatusBadge } from '@/components/issues/StatusBadge';
+import { issueService, categoryService, departmentService } from '@/lib/database';
+import type { Database } from '@/lib/database.types';
+
+type Issue = Database['public']['Tables']['issues']['Row'] & {
+  category?: Database['public']['Tables']['categories']['Row'];
+  department?: Database['public']['Tables']['departments']['Row'];
+};
+
+type Category = Database['public']['Tables']['categories']['Row'];
+type Department = Database['public']['Tables']['departments']['Row'];
 
 export function IssueTracker() {
-  const [issues, setIssues] = useState<IssueReport[]>([]);
+  const [issues, setIssues] = useState<Issue[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedIssue, setSelectedIssue] = useState<string | null>(null);
+  const [editingIssue, setEditingIssue] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState({
+    title: '',
+    description: '',
+    category_id: '',
+    department_id: '',
+    priority: 'medium' as 'low' | 'medium' | 'high' | 'urgent'
+  });
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [savingEdit, setSavingEdit] = useState(false);
   const { user } = useAuth();
   const { toast } = useToast();
 
@@ -35,65 +60,43 @@ export function IssueTracker() {
       return;
     }
 
-    const q = query(
-      collection(db, 'reports'),
-      where('citizenId', '==', user.id),
-      orderBy('createdAt', 'desc')
-    );
+    const fetchData = async () => {
+      try {
+        const [userIssues, allCategories, allDepartments] = await Promise.all([
+          issueService.getUserIssues(user.id),
+          categoryService.getCategories(),
+          departmentService.getDepartments()
+        ]);
+        setIssues(userIssues);
+        setCategories(allCategories);
+        setDepartments(allDepartments);
+      } catch (error) {
+        console.error('Error fetching data:', error);
+        toast({
+          variant: 'destructive',
+          title: 'Error',
+          description: 'Failed to load your issues. Please try again.',
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const issuesData = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as IssueReport[];
-      
-      setIssues(issuesData);
-      setLoading(false);
-    }, (error) => {
-      console.error('Error fetching issues:', error);
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: 'Failed to load your issues. Please try again.',
-      });
-      setLoading(false);
-    });
-
-    return () => unsubscribe();
+    fetchData();
   }, [user, toast]);
 
   const handleVote = async (issueId: string) => {
-    if (!user) return;
-
-    try {
-      const issueRef = doc(db, 'reports', issueId);
-      const issue = issues.find(i => i.id === issueId);
-      
-      if (issue && !issue.votedBy.includes(user.id)) {
-        await updateDoc(issueRef, {
-          votes: (issue.votes || 0) + 1,
-          votedBy: arrayUnion(user.id)
-        });
-
-        toast({
-          title: 'Vote recorded',
-          description: 'Thank you for supporting this issue!',
-        });
-      }
-    } catch (error) {
-      console.error('Error voting:', error);
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: 'Failed to record your vote. Please try again.',
-      });
-    }
+    // Voting functionality removed for now - can be implemented later with Supabase
+    toast({
+      title: 'Feature coming soon',
+      description: 'Voting will be available in a future update.',
+    });
   };
 
   const getStatusProgress = (status: string) => {
     switch (status) {
       case 'submitted': return 25;
-      case 'acknowledged': return 50;
+      case 'under_review': return 50;
       case 'in_progress': return 75;
       case 'resolved': return 100;
       default: return 0;
@@ -103,23 +106,92 @@ export function IssueTracker() {
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'submitted': return <Clock className="h-4 w-4" />;
-      case 'acknowledged': return <Eye className="h-4 w-4" />;
+      case 'under_review': return <Eye className="h-4 w-4" />;
       case 'in_progress': return <AlertCircle className="h-4 w-4" />;
       case 'resolved': return <CheckCircle className="h-4 w-4" />;
       default: return <Clock className="h-4 w-4" />;
     }
   };
 
-  const formatDate = (date: any) => {
+  const formatDate = (date: string | null) => {
     if (!date) return 'Unknown';
-    const d = date.toDate ? date.toDate() : new Date(date);
-    return d.toLocaleDateString('en-IN', { 
-      day: 'numeric', 
-      month: 'short', 
+    const d = new Date(date);
+    return d.toLocaleDateString('en-IN', {
+      day: 'numeric',
+      month: 'short',
       year: 'numeric',
       hour: '2-digit',
       minute: '2-digit'
     });
+  };
+
+  const startEditing = (issue: Issue) => {
+    setEditingIssue(issue.id);
+    setEditForm({
+      title: issue.title,
+      description: issue.description,
+      category_id: issue.category_id,
+      department_id: issue.department_id || '',
+      priority: issue.priority
+    });
+  };
+
+  const cancelEditing = () => {
+    setEditingIssue(null);
+    setEditForm({
+      title: '',
+      description: '',
+      category_id: '',
+      department_id: '',
+      priority: 'medium'
+    });
+  };
+
+  const saveEdit = async () => {
+    if (!editingIssue) return;
+
+    setSavingEdit(true);
+    try {
+      const updatedIssue = await issueService.updateIssue(editingIssue, {
+        title: editForm.title,
+        description: editForm.description,
+        category_id: editForm.category_id,
+        department_id: editForm.department_id || undefined,
+        priority: editForm.priority
+      });
+
+      if (updatedIssue) {
+        // Update the issue in the local state
+        setIssues(prev => prev.map(issue =>
+          issue.id === editingIssue
+            ? { ...issue, ...updatedIssue }
+            : issue
+        ));
+
+        toast({
+          title: 'Issue updated',
+          description: 'Your issue has been successfully updated.',
+        });
+      }
+    } catch (error) {
+      console.error('❌ Error updating issue:', {
+        error,
+        editingIssue,
+        editForm,
+        errorMessage: error instanceof Error ? error.message : 'Unknown error'
+      });
+      
+      toast({
+        variant: 'destructive',
+        title: 'Failed to Update Issue',
+        description: error instanceof Error 
+          ? `Error: ${error.message}` 
+          : 'An unexpected error occurred. Please try again.',
+      });
+    } finally {
+      setSavingEdit(false);
+      setEditingIssue(null);
+    }
   };
 
   if (!user) {
@@ -180,10 +252,10 @@ export function IssueTracker() {
                       <div className="flex items-center space-x-4 text-sm text-gray-500 mb-3">
                         <span className="flex items-center space-x-1">
                           <MapPin className="h-3 w-3" />
-                          <span>{issue.location.city}, {issue.location.state}</span>
+                          <span>Location: {issue.latitude && issue.longitude ? `${issue.latitude.toFixed(4)}, ${issue.longitude.toFixed(4)}` : 'Not specified'}</span>
                         </span>
-                        <span>Reported: {formatDate(issue.createdAt)}</span>
-                        <span className="capitalize">{issue.category.replace('_', ' ')}</span>
+                        <span>Reported: {formatDate(issue.created_at)}</span>
+                        <span className="capitalize">{issue.category?.name || 'General'}</span>
                       </div>
                     </div>
                     
@@ -225,22 +297,8 @@ export function IssueTracker() {
                     </div>
                   </div>
 
-                  {/* Progress Notes */}
-                  {issue.progressNotes && issue.progressNotes.length > 0 && (
-                    <div className="mb-4">
-                      <h4 className="font-medium text-sm mb-2">Updates:</h4>
-                      <div className="space-y-2">
-                        {issue.progressNotes.slice(-3).map((note, index) => (
-                          <div key={index} className="p-2 bg-gray-50 rounded text-sm">
-                            <p className="text-gray-700">{note.note}</p>
-                            <p className="text-xs text-gray-500 mt-1">
-                              {note.adminName} • {formatDate(note.timestamp)}
-                            </p>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+                  {/* Progress Notes - Removed for now as not in current schema */}
+                  {/* Will be added back when issue_updates table is properly integrated */}
 
                   {/* Actions */}
                   <div className="flex justify-between items-center">
@@ -249,13 +307,23 @@ export function IssueTracker() {
                         variant="outline"
                         size="sm"
                         onClick={() => handleVote(issue.id)}
-                        disabled={issue.votedBy?.includes(user.id)}
+                        disabled={false}
                         className="flex items-center space-x-1"
                       >
                         <ThumbsUp className="h-3 w-3" />
-                        <span>{issue.votes || 0}</span>
+                        <span>{issue.vote_count || 0}</span>
                       </Button>
                       
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => startEditing(issue)}
+                        className="flex items-center space-x-1"
+                      >
+                        <Edit className="h-3 w-3" />
+                        <span>Edit</span>
+                      </Button>
+
                       <Button
                         variant="outline"
                         size="sm"
@@ -275,19 +343,24 @@ export function IssueTracker() {
                     <div className="mt-4 pt-4 border-t space-y-3">
                       <div>
                         <h4 className="font-medium text-sm mb-1">Department:</h4>
-                        <p className="text-sm text-gray-600">{issue.department}</p>
+                        <p className="text-sm text-gray-600">{issue.department?.name || 'Not assigned'}</p>
                       </div>
-                      
+
                       <div>
-                        <h4 className="font-medium text-sm mb-1">Full Address:</h4>
-                        <p className="text-sm text-gray-600">{issue.location.address}</p>
+                        <h4 className="font-medium text-sm mb-1">Location:</h4>
+                        <p className="text-sm text-gray-600">
+                          {issue.latitude && issue.longitude 
+                            ? `Coordinates: ${issue.latitude.toFixed(4)}, ${issue.longitude.toFixed(4)}` 
+                            : 'Location not specified'
+                          }
+                        </p>
                       </div>
-                      
-                      {issue.photos && issue.photos.length > 0 && (
+
+                      {issue.photo_urls && issue.photo_urls.length > 0 && (
                         <div>
                           <h4 className="font-medium text-sm mb-2">Photos:</h4>
                           <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                            {issue.photos.map((photo, index) => (
+                            {issue.photo_urls.map((photo, index) => (
                               <img
                                 key={index}
                                 src={photo}
@@ -306,6 +379,112 @@ export function IssueTracker() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Edit Issue Dialog */}
+      <Dialog open={!!editingIssue} onOpenChange={() => cancelEditing()}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Edit Issue</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium">Title</label>
+              <Input
+                value={editForm.title}
+                onChange={(e) => setEditForm(prev => ({ ...prev, title: e.target.value }))}
+                placeholder="Issue title"
+              />
+            </div>
+
+            <div>
+              <label className="text-sm font-medium">Description</label>
+              <Textarea
+                value={editForm.description}
+                onChange={(e) => setEditForm(prev => ({ ...prev, description: e.target.value }))}
+                placeholder="Describe the issue"
+                rows={3}
+              />
+            </div>
+
+            <div>
+              <label className="text-sm font-medium">Category</label>
+              <Select
+                value={editForm.category_id}
+                onValueChange={(value) => setEditForm(prev => ({ ...prev, category_id: value }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select category" />
+                </SelectTrigger>
+                <SelectContent>
+                  {categories.map((category) => (
+                    <SelectItem key={category.id} value={category.id}>
+                      {category.icon} {category.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <label className="text-sm font-medium">Department</label>
+              <Select
+                value={editForm.department_id}
+                onValueChange={(value) => setEditForm(prev => ({ ...prev, department_id: value }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select department" />
+                </SelectTrigger>
+                <SelectContent>
+                  {departments.map((department) => (
+                    <SelectItem key={department.id} value={department.id}>
+                      {department.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <label className="text-sm font-medium">Priority</label>
+              <Select
+                value={editForm.priority}
+                onValueChange={(value: 'low' | 'medium' | 'high' | 'urgent') => 
+                  setEditForm(prev => ({ ...prev, priority: value }))
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="low">Low</SelectItem>
+                  <SelectItem value="medium">Medium</SelectItem>
+                  <SelectItem value="high">High</SelectItem>
+                  <SelectItem value="urgent">Urgent</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex justify-end space-x-2 pt-4">
+              <Button variant="outline" onClick={cancelEditing}>
+                Cancel
+              </Button>
+              <Button onClick={saveEdit} disabled={savingEdit}>
+                {savingEdit ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="mr-2 h-4 w-4" />
+                    Save Changes
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

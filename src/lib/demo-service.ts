@@ -12,11 +12,11 @@ export const isDemoMode = () => {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   
-  // Demo mode disabled - always use Supabase
-  return false;
+  // TEMPORARILY FORCE DEMO MODE TO TEST DATA LOADING
+  return true;
   
-  // Original logic kept for reference:
-  // return !url || !key || url.includes('your-project-ref') || key.includes('your-anon-key');
+  // Enable demo mode if Supabase credentials are missing or placeholder
+  // return !url || !key || url.includes('your-project-ref') || key.includes('your-anon-key') || url.includes('demo') || key.includes('demo');
 };
 
 // Demo data
@@ -186,12 +186,84 @@ const initDemoData = () => {
   localStorage.setItem('demo_categories', JSON.stringify(demoCategories));
   localStorage.setItem('demo_departments', JSON.stringify(demoDepartments));
   
-  if (!localStorage.getItem('demo_issues')) {
-    localStorage.setItem('demo_issues', JSON.stringify([]));
+  // Initialize with sample issues if empty
+  if (!localStorage.getItem('demo_issues') || JSON.parse(localStorage.getItem('demo_issues') || '[]').length === 0) {
+    const sampleIssues: Issue[] = [
+      {
+        id: '1',
+        title: 'Pothole on Main Street',
+        description: 'Large pothole causing traffic hazards near the intersection of Main Street and Oak Avenue.',
+        category_id: '1',
+        department_id: '1',
+        user_id: 'demo-user-1',
+        priority: 'high',
+        status: 'submitted',
+        verification_status: 'pending',
+        photo_urls: null,
+        audio_url: null,
+        latitude: 28.6139,
+        longitude: 77.2090,
+        vote_count: 5,
+        assigned_to: null,
+        created_at: new Date(Date.now() - 86400000).toISOString(),
+        updated_at: new Date(Date.now() - 86400000).toISOString(),
+        resolved_at: null
+      },
+      {
+        id: '2',
+        title: 'Street Light Not Working',
+        description: 'The street light at the corner of Elm Street and Pine Road has been out for a week.',
+        category_id: '3',
+        department_id: '4',
+        user_id: 'demo-user-1',
+        priority: 'medium',
+        status: 'in_progress',
+        verification_status: 'verified',
+        photo_urls: null,
+        audio_url: null,
+        latitude: 28.7041,
+        longitude: 77.1025,
+        vote_count: 3,
+        assigned_to: 'admin-user',
+        created_at: new Date(Date.now() - 172800000).toISOString(),
+        updated_at: new Date(Date.now() - 86400000).toISOString(),
+        resolved_at: null
+      }
+    ];
+    localStorage.setItem('demo_issues', JSON.stringify(sampleIssues));
   }
   
-  if (!localStorage.getItem('demo_profiles')) {
-    localStorage.setItem('demo_profiles', JSON.stringify([]));
+  // Initialize with sample profiles if empty
+  if (!localStorage.getItem('demo_profiles') || JSON.parse(localStorage.getItem('demo_profiles') || '[]').length === 0) {
+    const sampleProfiles: Profile[] = [
+      {
+        id: 'demo-user-1',
+        email: 'demo@example.com',
+        full_name: 'Demo User',
+        avatar_url: null,
+        phone: '+91-9876543210',
+        address: '123 Demo Street',
+        city: 'New Delhi',
+        state: 'Delhi',
+        role: 'citizen',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      },
+      {
+        id: 'admin-user',
+        email: 'admin@example.com',
+        full_name: 'Admin User',
+        avatar_url: null,
+        phone: '+91-9876543212',
+        address: '789 Admin Road',
+        city: 'Bangalore',
+        state: 'Karnataka',
+        role: 'admin',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }
+    ];
+    localStorage.setItem('demo_profiles', JSON.stringify(sampleProfiles));
   }
 };
 

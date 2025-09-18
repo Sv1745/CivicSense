@@ -82,7 +82,11 @@ export function UserProfileForm() {
 
   // Load user data when component mounts
   useEffect(() => {
+    console.log('🔍 UserProfileForm - User state:', user);
+    console.log('🔍 UserProfileForm - Form values:', form.getValues());
+
     if (user) {
+      console.log('📝 Loading user data into form:', user);
       form.reset({
         full_name: user.full_name || "",
         phone: user.phone || "",
@@ -90,10 +94,12 @@ export function UserProfileForm() {
         city: user.city || "",
         state: user.state || "",
       });
-      
+
       if (user.avatar_url) {
         setAvatarPreview(user.avatar_url);
       }
+    } else {
+      console.log('⚠️ No user data available');
     }
   }, [user, form]);
 

@@ -5,11 +5,49 @@
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "postgis";
 
--- Create custom types
-CREATE TYPE user_role AS ENUM ('citizen', 'admin', 'department_head');
-CREATE TYPE issue_status AS ENUM ('submitted', 'under_review', 'in_progress', 'resolved', 'rejected');
-CREATE TYPE issue_priority AS ENUM ('low', 'medium', 'high', 'urgent');
-CREATE TYPE verification_status AS ENUM ('pending', 'verified', 'disputed', 'false_report');
+-- Test query to verify database connection
+SELECT 'Database connection successful' as status;
+
+-- Check if profiles table exists
+SELECT
+  schemaname,
+  tablename,
+  tableowner
+FROM pg_tables
+WHERE tablename = 'profiles' AND schemaname = 'public';
+
+-- Check RLS status on profiles table
+SELECT
+  schemaname,
+  tablename,
+  rowsecurity
+FROM pg_tables
+WHERE tablename = 'profiles' AND schemaname = 'public';
+
+-- Create custom types (with safe handling for existing types)
+DO $$ BEGIN
+    CREATE TYPE user_role AS ENUM ('citizen', 'admin', 'department_head');
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END $$;
+
+DO $$ BEGIN
+    CREATE TYPE issue_status AS ENUM ('submitted', 'under_review', 'in_progress', 'resolved', 'rejected');
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END $$;
+
+DO $$ BEGIN
+    CREATE TYPE issue_priority AS ENUM ('low', 'medium', 'high', 'urgent');
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END $$;
+
+DO $$ BEGIN
+    CREATE TYPE verification_status AS ENUM ('pending', 'verified', 'disputed', 'false_report');
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END $$;
 
 -- Profiles table (extends Supabase auth.users)
 CREATE TABLE IF NOT EXISTS public.profiles (
@@ -109,11 +147,26 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Create triggers for updated_at
+
+-- Safely drop and recreate triggers for updated_at
+DO $$ BEGIN
+    IF EXISTS (
+        SELECT 1 FROM pg_trigger WHERE tgname = 'profiles_updated_at'
+    ) THEN
+        DROP TRIGGER profiles_updated_at ON public.profiles;
+    END IF;
+END $$;
 CREATE TRIGGER profiles_updated_at
     BEFORE UPDATE ON public.profiles
     FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
 
+DO $$ BEGIN
+    IF EXISTS (
+        SELECT 1 FROM pg_trigger WHERE tgname = 'issues_updated_at'
+    ) THEN
+        DROP TRIGGER issues_updated_at ON public.issues;
+    END IF;
+END $$;
 CREATE TRIGGER issues_updated_at
     BEFORE UPDATE ON public.issues
     FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
@@ -147,19 +200,24 @@ ALTER TABLE public.issue_updates ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies for profiles
+DROP POLICY IF EXISTS "Users can view all profiles" ON public.profiles;
 CREATE POLICY "Users can view all profiles" ON public.profiles
     FOR SELECT USING (true);
 
+DROP POLICY IF EXISTS "Users can update their own profile" ON public.profiles;
 CREATE POLICY "Users can update their own profile" ON public.profiles
     FOR UPDATE USING (auth.uid() = id);
 
+DROP POLICY IF EXISTS "Users can insert their own profile" ON public.profiles;
 CREATE POLICY "Users can insert their own profile" ON public.profiles
     FOR INSERT WITH CHECK (auth.uid() = id);
 
 -- RLS Policies for categories
+DROP POLICY IF EXISTS "Anyone can view categories" ON public.categories;
 CREATE POLICY "Anyone can view categories" ON public.categories
     FOR SELECT USING (true);
 
+DROP POLICY IF EXISTS "Only admins can modify categories" ON public.categories;
 CREATE POLICY "Only admins can modify categories" ON public.categories
     FOR ALL USING (
         EXISTS (
@@ -169,9 +227,11 @@ CREATE POLICY "Only admins can modify categories" ON public.categories
     );
 
 -- RLS Policies for departments
+DROP POLICY IF EXISTS "Anyone can view departments" ON public.departments;
 CREATE POLICY "Anyone can view departments" ON public.departments
     FOR SELECT USING (true);
 
+DROP POLICY IF EXISTS "Only admins can modify departments" ON public.departments;
 CREATE POLICY "Only admins can modify departments" ON public.departments
     FOR ALL USING (
         EXISTS (
@@ -181,15 +241,19 @@ CREATE POLICY "Only admins can modify departments" ON public.departments
     );
 
 -- RLS Policies for issues
+DROP POLICY IF EXISTS "Anyone can view issues" ON public.issues;
 CREATE POLICY "Anyone can view issues" ON public.issues
     FOR SELECT USING (true);
 
+DROP POLICY IF EXISTS "Users can create their own issues" ON public.issues;
 CREATE POLICY "Users can create their own issues" ON public.issues
     FOR INSERT WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can update their own issues" ON public.issues;
 CREATE POLICY "Users can update their own issues" ON public.issues
     FOR UPDATE USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Admins and department heads can update any issue" ON public.issues;
 CREATE POLICY "Admins and department heads can update any issue" ON public.issues
     FOR UPDATE USING (
         EXISTS (
@@ -199,36 +263,52 @@ CREATE POLICY "Admins and department heads can update any issue" ON public.issue
     );
 
 -- RLS Policies for issue_updates
+DROP POLICY IF EXISTS "Anyone can view issue updates" ON public.issue_updates;
 CREATE POLICY "Anyone can view issue updates" ON public.issue_updates
     FOR SELECT USING (true);
 
+DROP POLICY IF EXISTS "Authenticated users can create issue updates" ON public.issue_updates;
 CREATE POLICY "Authenticated users can create issue updates" ON public.issue_updates
     FOR INSERT WITH CHECK (auth.uid() = user_id);
 
 -- RLS Policies for notifications
+DROP POLICY IF EXISTS "Users can view their own notifications" ON public.notifications;
 CREATE POLICY "Users can view their own notifications" ON public.notifications
     FOR SELECT USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "System can create notifications" ON public.notifications;
 CREATE POLICY "System can create notifications" ON public.notifications
     FOR INSERT WITH CHECK (true);
 
+DROP POLICY IF EXISTS "Users can update their own notifications" ON public.notifications;
 CREATE POLICY "Users can update their own notifications" ON public.notifications
     FOR UPDATE USING (auth.uid() = user_id);
 
 -- Create storage bucket for issue attachments
+-- Create all required storage buckets
 INSERT INTO storage.buckets (id, name, public) VALUES ('issue-attachments', 'issue-attachments', false)
 ON CONFLICT (id) DO NOTHING;
+INSERT INTO storage.buckets (id, name, public) VALUES ('issue-photos', 'issue-photos', false)
+ON CONFLICT (id) DO NOTHING;
+INSERT INTO storage.buckets (id, name, public) VALUES ('issue-audio', 'issue-audio', false)
+ON CONFLICT (id) DO NOTHING;
+INSERT INTO storage.buckets (id, name, public) VALUES ('avatars', 'avatars', false)
+ON CONFLICT (id) DO NOTHING;
 
--- Storage policies
+-- Storage policies (drop existing ones first)
+DROP POLICY IF EXISTS "Users can upload their own files" ON storage.objects;
 CREATE POLICY "Users can upload their own files" ON storage.objects
     FOR INSERT WITH CHECK (bucket_id = 'issue-attachments' AND auth.uid()::text = (storage.foldername(name))[1]);
 
+DROP POLICY IF EXISTS "Users can view all files" ON storage.objects;
 CREATE POLICY "Users can view all files" ON storage.objects
     FOR SELECT USING (bucket_id = 'issue-attachments');
 
+DROP POLICY IF EXISTS "Users can update their own files" ON storage.objects;
 CREATE POLICY "Users can update their own files" ON storage.objects
     FOR UPDATE USING (bucket_id = 'issue-attachments' AND auth.uid()::text = (storage.foldername(name))[1]);
 
+DROP POLICY IF EXISTS "Users can delete their own files" ON storage.objects;
 CREATE POLICY "Users can delete their own files" ON storage.objects
     FOR DELETE USING (bucket_id = 'issue-attachments' AND auth.uid()::text = (storage.foldername(name))[1]);
 
@@ -247,15 +327,38 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Create trigger for new user registration
-CREATE TRIGGER on_auth_user_created
-    AFTER INSERT ON auth.users
-    FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+-- Create trigger for new user registration (handle existing trigger safely)
+DO $$ BEGIN
+    CREATE TRIGGER on_auth_user_created
+        AFTER INSERT ON auth.users
+        FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END $$;
 
 -- Enable real-time for all tables
-ALTER PUBLICATION supabase_realtime ADD TABLE public.issues;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.issue_updates;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.notifications;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.profiles;
+-- Safely add tables to supabase_realtime publication
+DO $$ BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND schemaname = 'public' AND tablename = 'issues'
+    ) THEN
+        EXECUTE 'ALTER PUBLICATION supabase_realtime ADD TABLE public.issues';
+    END IF;
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND schemaname = 'public' AND tablename = 'issue_updates'
+    ) THEN
+        EXECUTE 'ALTER PUBLICATION supabase_realtime ADD TABLE public.issue_updates';
+    END IF;
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND schemaname = 'public' AND tablename = 'notifications'
+    ) THEN
+        EXECUTE 'ALTER PUBLICATION supabase_realtime ADD TABLE public.notifications';
+    END IF;
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND schemaname = 'public' AND tablename = 'profiles'
+    ) THEN
+        EXECUTE 'ALTER PUBLICATION supabase_realtime ADD TABLE public.profiles';
+    END IF;
+END $$;
 
 NOTIFY pgrst, 'reload schema';

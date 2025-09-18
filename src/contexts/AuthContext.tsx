@@ -4,6 +4,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User as SupabaseUser, AuthError } from '@supabase/supabase-js';
 import supabase from '@/lib/supabase';
 import { offlineModeService } from '@/lib/offline-mode';
+import { useToast } from '@/hooks/use-toast';
 import type { Database } from '@/lib/database.types';
 
 type Profile = Database['public']['Tables']['profiles']['Row'];
@@ -55,6 +56,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [supabaseUser, setSupabaseUser] = useState<SupabaseUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [isOffline, setIsOffline] = useState(false);
+  const { toast } = useToast();
 
   useEffect(() => {
     const initializeAuth = async () => {
@@ -105,8 +107,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Listen for auth changes
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
           async (event, session) => {
+            console.log('🔄 Auth state change:', event, session?.user?.email);
+
+            if (event === 'SIGNED_IN' && session?.user) {
+              console.log('✅ User signed in successfully');
+              // Show success toast for sign in
+              toast({
+                title: 'Welcome!',
+                description: 'You have been successfully signed in.',
+              });
+            }
+
             setSupabaseUser(session?.user ?? null);
-            
+
             if (session?.user) {
               await fetchUserProfile(session.user.id);
             } else {
@@ -130,6 +143,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const fetchUserProfile = async (userId: string) => {
     try {
+      console.log('🔍 Fetching user profile for:', userId);
+
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
@@ -137,33 +152,50 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .single();
 
       if (error) {
+        console.error('❌ Profile fetch error:', error);
+
         if (error.code === 'PGRST116') {
           // Profile doesn't exist, try to create one
-          console.log('Profile not found, attempting to create...');
+          console.log('📝 Profile not found, attempting to create...');
           try {
             const { data: { user } } = await supabase.auth.getUser();
             if (user) {
+              console.log('👤 Creating profile for user:', user.email);
               const createdProfile = await createUserProfile(
-                user.id, 
-                user.email || '', 
-                user.user_metadata?.full_name || 'User'
+                user.id,
+                user.email || '',
+                user.user_metadata?.full_name || user.user_metadata?.name || 'User'
               );
               if (createdProfile) {
+                console.log('✅ Profile created successfully');
                 setUser(createdProfile as Profile);
+                toast({
+                  title: 'Profile Created',
+                  description: 'Your profile has been set up successfully.',
+                });
+              } else {
+                console.error('❌ Failed to create profile');
               }
               return;
+            } else {
+              console.error('❌ No authenticated user found');
             }
           } catch (createError) {
-            console.error('Failed to create missing profile:', createError);
+            console.error('❌ Failed to create missing profile:', createError);
           }
+        } else if (error.code === '42P01') {
+          console.error('❌ Profiles table does not exist. Please run the database setup script.');
+        } else if (error.code === '42501') {
+          console.error('❌ Permission denied. Check RLS policies.');
         }
-        console.error('Error fetching user profile:', error);
+
         setUser(null);
       } else {
+        console.log('✅ Profile loaded successfully:', data.email);
         setUser(data);
       }
     } catch (error) {
-      console.error('Error fetching user profile:', error);
+      console.error('❌ Error fetching user profile:', error);
       setUser(null);
     } finally {
       setLoading(false);
@@ -253,10 +285,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
+    // Use dynamic redirect URL based on current domain
+    const currentOrigin = typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBLIC_APP_URL;
+    const redirectTo = `${currentOrigin}/auth/callback`;
+
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/callback`
+        redirectTo
       }
     });
 

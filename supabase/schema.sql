@@ -200,6 +200,9 @@ create policy "Admins can update any issue" on public.issues
     )
   );
 
+create policy "Users can update their own issues" on public.issues
+  for update using (auth.uid() = user_id);
+
 -- Issue updates: Users can view updates for their issues, admins can view all
 create policy "Users can view updates for their issues" on public.issue_updates
   for select using (
