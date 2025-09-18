@@ -68,7 +68,7 @@ export function IssueManagementForm({ issue, onUpdate }: IssueManagementFormProp
     resolver: zodResolver(updateSchema),
     defaultValues: {
       status: issue.status,
-      assigned_to: issue.assigned_to || "",
+      assigned_to: issue.assigned_to || "unassigned",
       comment: "",
     },
   });
@@ -138,7 +138,7 @@ export function IssueManagementForm({ issue, onUpdate }: IssueManagementFormProp
       // Update the issue
       const updateData: Partial<Issue> = {
         status: values.status,
-        assigned_to: values.assigned_to || null,
+        assigned_to: values.assigned_to === "unassigned" ? null : values.assigned_to || null,
       };
 
       // Set resolved_at when status changes to resolved
@@ -339,14 +339,14 @@ export function IssueManagementForm({ issue, onUpdate }: IssueManagementFormProp
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Assign To</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value || ""}>
+                      <Select onValueChange={field.onChange} value={field.value || "unassigned"}>
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Select assignee" />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="">Unassigned</SelectItem>
+                          <SelectItem value="unassigned">Unassigned</SelectItem>
                           {departmentUsers.map(user => (
                             <SelectItem key={user.id} value={user.id}>
                               <div className="flex items-center gap-2">
