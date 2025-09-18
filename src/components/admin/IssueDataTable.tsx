@@ -10,6 +10,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { IssueManagementForm } from '@/components/admin/IssueManagementForm';
 import { Input } from "@/components/ui/input";
 import {
   DropdownMenu,
@@ -31,6 +33,7 @@ interface IssueDataTableProps {
 
 export function IssueDataTable({ issues = [], loading = false }: IssueDataTableProps) {
   const [filter, setFilter] = React.useState("");
+  const [selectedIssue, setSelectedIssue] = React.useState<any | null>(null);
   
   const filteredIssues = issues.filter(issue => 
     issue.title?.toLowerCase().includes(filter.toLowerCase()) ||
@@ -141,7 +144,7 @@ export function IssueDataTable({ issues = [], loading = false }: IssueDataTableP
                           <Eye className="mr-2 h-4 w-4" />
                           View Details
                         </DropdownMenuItem>
-                        <DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setSelectedIssue(issue)}>
                           <Edit className="mr-2 h-4 w-4" />
                           Manage Issue
                         </DropdownMenuItem>
@@ -160,6 +163,25 @@ export function IssueDataTable({ issues = [], loading = false }: IssueDataTableP
           </TableBody>
         </Table>
       </div>
+      {/* Management Dialog */}
+      <Dialog open={!!selectedIssue} onOpenChange={(open) => { if (!open) setSelectedIssue(null); }}>
+        <DialogContent className="sm:max-w-[800px]">
+          <DialogHeader>
+            <DialogTitle>Manage Issue</DialogTitle>
+          </DialogHeader>
+          {selectedIssue && (
+            <IssueManagementForm
+              issue={selectedIssue}
+              onUpdate={(updated: any) => {
+                // Update the local issues array
+                const idx = issues.findIndex(i => i.id === updated.id);
+                if (idx !== -1) issues[idx] = updated;
+                setSelectedIssue(null);
+              }}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
