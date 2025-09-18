@@ -25,7 +25,7 @@ export const supabase: SupabaseClient<Database> = createClient<Database>(
     auth: {
       autoRefreshToken: true,
       persistSession: true,
-      detectSessionInUrl: true,
+      detectSessionInUrl: false, // Disable client-side URL detection for server-side OAuth
       flowType: 'pkce',
       debug: process.env.NODE_ENV === 'development'
     },

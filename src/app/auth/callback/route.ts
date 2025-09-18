@@ -34,6 +34,19 @@ export async function GET(request: NextRequest) {
     try {
       const cookieStore = await cookies()
 
+      // Log all available cookies for debugging
+      const allCookies = cookieStore.getAll()
+      console.log('🍪 Available cookies:', allCookies.map(c => ({ name: c.name, hasValue: !!c.value })))
+
+      // Specifically check for PKCE-related cookies
+      const pkceCookies = ['sb-ccdjkyqbnhsrwkmwizrq-auth-token', 'supabase-auth-token', 'sb-auth-token']
+      pkceCookies.forEach(cookieName => {
+        const cookie = cookieStore.get(cookieName)
+        if (cookie) {
+          console.log(`🍪 Found cookie: ${cookieName} = ${cookie.value?.substring(0, 20)}...`)
+        }
+      })
+
       console.log('🔧 Creating Supabase server client...')
       const supabase = createServerClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -65,7 +78,11 @@ export async function GET(request: NextRequest) {
         console.error('❌ Supabase client health test failed:', healthTestError)
       }
 
-      console.log('🔄 Exchanging code for session...', { codeLength: code.length })
+      console.log('🔄 Exchanging code for session...', { 
+        codeLength: code.length,
+        codeValue: code.substring(0, 20) + '...',
+        codeIsEmpty: !code || code.trim() === ''
+      })
       const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code)
 
       console.log('🔍 Exchange result:', {
