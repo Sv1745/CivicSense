@@ -118,11 +118,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               });
             }
 
+            if (event === 'SIGNED_OUT') {
+              console.log('👋 User signed out');
+              setUser(null);
+              setSupabaseUser(null);
+              setLoading(false);
+              toast({
+                title: 'Signed Out',
+                description: 'You have been successfully signed out.',
+              });
+            }
+
             setSupabaseUser(session?.user ?? null);
 
             if (session?.user) {
               await fetchUserProfile(session.user.id);
-            } else {
+            } else if (event !== 'SIGNED_OUT') {
+              // Only clear user state if it's not already handled by SIGNED_OUT event
               setUser(null);
               setLoading(false);
             }
@@ -300,15 +312,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const logout = async () => {
-    if (isDemoMode()) {
-      console.log('🎭 Demo mode: Logout simulation');
+    try {
+      if (isDemoMode()) {
+        console.log('🎭 Demo mode: Logout simulation');
+        setUser(null);
+        setSupabaseUser(null);
+        setLoading(false);
+        toast({
+          title: 'Signed Out',
+          description: 'You have been successfully signed out.',
+        });
+        return;
+      }
+
+      // Clear local state immediately
       setUser(null);
       setSupabaseUser(null);
-      return;
-    }
+      setLoading(false);
 
-    const { error } = await supabase.auth.signOut();
-    if (error) throw error;
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        console.error('❌ Error during sign out:', error);
+        toast({
+          title: 'Sign Out Error',
+          description: 'There was an issue signing out. Please try again.',
+          variant: 'destructive',
+        });
+        throw error;
+      }
+
+      console.log('✅ User signed out successfully');
+    } catch (error) {
+      console.error('❌ Logout failed:', error);
+      // Revert local state if sign out failed
+      // Note: This might not work perfectly if the session was already cleared
+    }
   };
 
   const resetPassword = async (email: string) => {

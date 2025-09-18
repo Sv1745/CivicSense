@@ -12,11 +12,8 @@ export const isDemoMode = () => {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   
-  // TEMPORARILY FORCE DEMO MODE TO TEST DATA LOADING
-  return true;
-  
   // Enable demo mode if Supabase credentials are missing or placeholder
-  // return !url || !key || url.includes('your-project-ref') || key.includes('your-anon-key') || url.includes('demo') || key.includes('demo');
+  return !url || !key || url.includes('your-project-ref') || key.includes('your-anon-key') || url.includes('demo') || key.includes('demo');
 };
 
 // Demo data

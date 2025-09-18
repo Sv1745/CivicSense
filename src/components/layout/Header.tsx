@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Bug, Newspaper, User, LogOut, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
@@ -16,12 +17,18 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
 export function Header() {
   const { user, supabaseUser, signOut, loading } = useAuth();
+  const router = useRouter();
 
   const handleSignOut = async () => {
     try {
+      console.log('🚪 Attempting to sign out...');
       await signOut();
+      console.log('✅ Sign out completed');
+      // Navigate to home page after logout
+      router.push('/');
     } catch (error) {
-      console.error('Error signing out:', error);
+      console.error('❌ Error signing out:', error);
+      // Error is already handled in the AuthContext
     }
   };
 
