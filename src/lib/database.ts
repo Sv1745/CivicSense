@@ -288,33 +288,61 @@ export const issueService = {
     }
     
     try {
-      const { data, error } = await supabase
+      // Get issues with category and department joins
+      const { data: issuesData, error: issuesError } = await supabase
         .from('issues')
         .select(`
           *,
-          category:categories(*),
-          department:departments(*),
-          user:profiles(full_name, email)
+          categories(*),
+          departments(*)
         `)
         .order('created_at', { ascending: false });
       
-      if (error) {
-        console.error('Error fetching all issues from Supabase:', JSON.stringify(error, null, 2));
-        // If table doesn't exist, fallback to demo data
-        if (error.code === 'PGRST116' || error.message?.includes('relation') || error.message?.includes('does not exist')) {
-          console.log('📋 Issues table not found, falling back to demo data');
-          const demoIssues = await demoService.getAllIssues();
-          console.log('🧪 issueService.getAllIssues: Supabase table missing, demo fallback used, returning', demoIssues.length, 'issues');
-          if (demoIssues.length > 0) console.log('🧪 Sample demo issue:', JSON.stringify(demoIssues[0]));
-          return demoIssues;
-        }
-        console.log('🧪 issueService.getAllIssues: unexpected supabase error, returning empty list');
+      if (issuesError) {
+        console.error('Error fetching issues:', JSON.stringify(issuesError, null, 2));
         return [];
       }
       
-      console.log('✅ issueService.getAllIssues: fetched', (data || []).length, 'issues from Supabase');
-      if (data && data.length > 0) console.log('✅ Sample Supabase issue:', JSON.stringify(data[0]));
-      return data || [];
+      if (!issuesData || issuesData.length === 0) {
+        console.log('✅ No issues found in database');
+        return [];
+      }
+      
+      // Manually fetch user profiles for each issue
+      const issuesWithUsers = await Promise.all(
+        issuesData.map(async (issue) => {
+          try {
+            const { data: userData, error: userError } = await supabase
+              .from('profiles')
+              .select('full_name, email')
+              .eq('id', issue.user_id)
+              .single();
+            
+            if (userError) {
+              console.warn(`Could not fetch user for issue ${issue.id}:`, userError.message);
+              return {
+                ...issue,
+                user: null
+              };
+            }
+            
+            return {
+              ...issue,
+              user: userData
+            };
+          } catch (err) {
+            console.warn(`Error fetching user for issue ${issue.id}:`, err);
+            return {
+              ...issue,
+              user: null
+            };
+          }
+        })
+      );
+      
+      console.log('✅ issueService.getAllIssues: fetched', issuesWithUsers.length, 'issues from Supabase with user data');
+      if (issuesWithUsers.length > 0) console.log('✅ Sample issue with user:', JSON.stringify(issuesWithUsers[0]));
+      return issuesWithUsers;
     } catch (err) {
       console.error('Issues fetch failed, using demo data:', err);
       const demoIssues = await demoService.getAllIssues();
