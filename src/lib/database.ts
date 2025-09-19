@@ -905,3 +905,234 @@ export const realtimeService = {
     supabase.removeAllChannels();
   }
 };
+
+// Voting operations
+export const voteService = {
+  async getUserVote(issueId: string, userId: string): Promise<'upvote' | 'downvote' | null> {
+    if (isDemoMode()) {
+      return await demoService.getUserVote(issueId, userId);
+    }
+
+    const { data, error } = await supabase
+      .from('votes')
+      .select('vote_type')
+      .eq('issue_id', issueId)
+      .eq('user_id', userId)
+      .single();
+
+    if (error) {
+      if (error.code === 'PGRST116') {
+        // No vote found
+        return null;
+      }
+      console.error('Error fetching user vote:', error);
+      return null;
+    }
+
+    return data.vote_type;
+  },
+
+  async voteOnIssue(issueId: string, userId: string, voteType: 'upvote' | 'downvote'): Promise<boolean> {
+    if (isDemoMode()) {
+      return await demoService.voteOnIssue(issueId, userId, voteType);
+    }
+
+    try {
+      // Check if user already voted
+      const existingVote = await this.getUserVote(issueId, userId);
+
+      if (existingVote === voteType) {
+        // User is trying to vote the same way, remove the vote
+        const { error } = await supabase
+          .from('votes')
+          .delete()
+          .eq('issue_id', issueId)
+          .eq('user_id', userId);
+
+        if (error) {
+          console.error('Error removing vote:', error);
+          return false;
+        }
+        return true;
+      } else if (existingVote) {
+        // User is changing their vote
+        const { error } = await supabase
+          .from('votes')
+          .update({ vote_type: voteType, updated_at: new Date().toISOString() })
+          .eq('issue_id', issueId)
+          .eq('user_id', userId);
+
+        if (error) {
+          console.error('Error updating vote:', error);
+          return false;
+        }
+        return true;
+      } else {
+        // New vote
+        const { error } = await supabase
+          .from('votes')
+          .insert({
+            issue_id: issueId,
+            user_id: userId,
+            vote_type: voteType
+          });
+
+        if (error) {
+          console.error('Error inserting vote:', error);
+          return false;
+        }
+        return true;
+      }
+    } catch (error) {
+      console.error('Error voting on issue:', error);
+      return false;
+    }
+  },
+
+  async getVoteStats(issueId: string): Promise<{ upvotes: number; downvotes: number; userVote: 'upvote' | 'downvote' | null }> {
+    if (isDemoMode()) {
+      return await demoService.getVoteStats(issueId);
+    }
+
+    try {
+      // Get vote counts
+      const { data: votes, error: votesError } = await supabase
+        .from('votes')
+        .select('vote_type')
+        .eq('issue_id', issueId);
+
+      if (votesError) {
+        console.error('Error fetching vote stats:', votesError);
+        return { upvotes: 0, downvotes: 0, userVote: null };
+      }
+
+      const upvotes = votes.filter(v => v.vote_type === 'upvote').length;
+      const downvotes = votes.filter(v => v.vote_type === 'downvote').length;
+
+      // Get current user's vote (if authenticated)
+      let userVote: 'upvote' | 'downvote' | null = null;
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          userVote = await this.getUserVote(issueId, user.id);
+        }
+      } catch (error) {
+        // User not authenticated, userVote remains null
+      }
+
+      return { upvotes, downvotes, userVote };
+    } catch (error) {
+      console.error('Error getting vote stats:', error);
+      return { upvotes: 0, downvotes: 0, userVote: null };
+    }
+  }
+};
+
+// Location-based operations
+export const locationService = {
+  async getNearbyIssues(userLat: number, userLng: number, radiusKm: number = 10): Promise<Issue[]> {
+    if (isDemoMode()) {
+      return await demoService.getNearbyIssues(userLat, userLng, radiusKm);
+    }
+
+    try {
+      // Use PostGIS for efficient proximity search
+      const { data, error } = await supabase
+        .rpc('get_nearby_issues', {
+          user_lat: userLat,
+          user_lng: userLng,
+          radius_km: radiusKm
+        });
+
+      if (error) {
+        console.error('Error fetching nearby issues:', error);
+        // Fallback to client-side filtering
+        return await this.getNearbyIssuesFallback(userLat, userLng, radiusKm);
+      }
+
+      return data || [];
+    } catch (error) {
+      console.error('Error in getNearbyIssues:', error);
+      // Fallback to client-side filtering
+      return await this.getNearbyIssuesFallback(userLat, userLng, radiusKm);
+    }
+  },
+
+  async getNearbyIssuesFallback(userLat: number, userLng: number, radiusKm: number = 10): Promise<Issue[]> {
+    // Fallback method using client-side distance calculation
+    const { data: issues, error } = await supabase
+      .from('issues')
+      .select(`
+        *,
+        category:categories(*),
+        department:departments(*),
+        user:profiles(*)
+      `)
+      .not('latitude', 'is', null)
+      .not('longitude', 'is', null);
+
+    if (error) {
+      console.error('Error fetching issues for fallback:', error);
+      return [];
+    }
+
+    // Filter issues by distance on client side
+    const nearbyIssues = issues.filter(issue => {
+      if (!issue.latitude || !issue.longitude) return false;
+
+      const distance = this.calculateDistance(
+        userLat, userLng,
+        issue.latitude, issue.longitude
+      );
+
+      return distance <= radiusKm;
+    });
+
+    return nearbyIssues;
+  },
+
+  calculateDistance(lat1: number, lng1: number, lat2: number, lng2: number): number {
+    const R = 6371; // Earth's radius in kilometers
+    const dLat = this.toRadians(lat2 - lat1);
+    const dLng = this.toRadians(lng2 - lng1);
+
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+              Math.cos(this.toRadians(lat1)) * Math.cos(this.toRadians(lat2)) *
+              Math.sin(dLng / 2) * Math.sin(dLng / 2);
+
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  },
+
+  toRadians(degrees: number): number {
+    return degrees * (Math.PI / 180);
+  },
+
+  async getUserLocation(): Promise<{ latitude: number; longitude: number } | null> {
+    return new Promise((resolve) => {
+      if (!navigator.geolocation) {
+        console.warn('Geolocation is not supported by this browser');
+        resolve(null);
+        return;
+      }
+
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          resolve({
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude
+          });
+        },
+        (error) => {
+          console.error('Error getting user location:', error);
+          resolve(null);
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 300000 // 5 minutes
+        }
+      );
+    });
+  }
+};

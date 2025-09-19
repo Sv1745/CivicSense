@@ -300,6 +300,48 @@ export type Database = {
           }
         ]
       }
+      votes: {
+        Row: {
+          id: string
+          issue_id: string
+          user_id: string
+          vote_type: 'upvote' | 'downvote'
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          issue_id: string
+          user_id: string
+          vote_type: 'upvote' | 'downvote'
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          issue_id?: string
+          user_id?: string
+          vote_type?: 'upvote' | 'downvote'
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "votes_issue_id_fkey"
+            columns: ["issue_id"]
+            isOneToOne: false
+            referencedRelation: "issues"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "votes_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
     }
     Views: {
       [_ in never]: never

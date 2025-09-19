@@ -9,6 +9,9 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
+import { Slider } from '@/components/ui/slider';
 import {
   Clock,
   CheckCircle,
@@ -20,11 +23,15 @@ import {
   Loader2,
   Edit,
   Save,
-  X
+  X,
+  Navigation,
+  Filter
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { StatusBadge } from '@/components/issues/StatusBadge';
+import { VoteButton } from '@/components/ui/VoteButton';
+import { useLocationFilter } from '@/hooks/useLocation';
 import { issueService, categoryService, departmentService } from '@/lib/database';
 import type { Database } from '@/lib/database.types';
 
@@ -54,6 +61,18 @@ export function IssueTracker() {
   const { user } = useAuth();
   const { toast } = useToast();
 
+  // Location filtering
+  const {
+    location,
+    radiusKm,
+    setRadiusKm,
+    showNearbyOnly,
+    setShowNearbyOnly,
+    requestLocation,
+    isWithinRadius,
+    getDistanceText
+  } = useLocationFilter();
+
   useEffect(() => {
     if (!user) {
       setLoading(false);
@@ -62,11 +81,25 @@ export function IssueTracker() {
 
     const fetchData = async () => {
       try {
-        const [userIssues, allCategories, allDepartments] = await Promise.all([
-          issueService.getUserIssues(user.id),
+        let userIssues: Issue[];
+
+        if (showNearbyOnly && location) {
+          // Get nearby issues
+          userIssues = await issueService.getNearbyIssues(
+            location.latitude,
+            location.longitude,
+            radiusKm
+          );
+        } else {
+          // Get all user issues
+          userIssues = await issueService.getUserIssues(user.id);
+        }
+
+        const [allCategories, allDepartments] = await Promise.all([
           categoryService.getCategories(),
           departmentService.getDepartments()
         ]);
+
         setIssues(userIssues);
         setCategories(allCategories);
         setDepartments(allDepartments);
@@ -75,7 +108,7 @@ export function IssueTracker() {
         toast({
           variant: 'destructive',
           title: 'Error',
-          description: 'Failed to load your issues. Please try again.',
+          description: 'Failed to load issues. Please try again.',
         });
       } finally {
         setLoading(false);
@@ -83,15 +116,15 @@ export function IssueTracker() {
     };
 
     fetchData();
-  }, [user, toast]);
+  }, [user, toast, showNearbyOnly, location, radiusKm]);
 
-  const handleVote = async (issueId: string) => {
-    // Voting functionality removed for now - can be implemented later with Supabase
-    toast({
-      title: 'Feature coming soon',
-      description: 'Voting will be available in a future update.',
-    });
-  };
+  // Filter issues based on location when location filtering is enabled
+  const filteredIssues = issues.filter(issue => {
+    if (!showNearbyOnly || !location || !issue.latitude || !issue.longitude) {
+      return true;
+    }
+    return isWithinRadius(issue.latitude, issue.longitude);
+  });
 
   const getStatusProgress = (status: string) => {
     switch (status) {
@@ -232,16 +265,74 @@ export function IssueTracker() {
 
   return (
     <div className="w-full max-w-6xl mx-auto space-y-6">
+      {/* Location Filtering Controls */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <Filter className="h-5 w-5" />
+            <span>Filter Issues</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-2">
+              <Switch
+                id="nearby-only"
+                checked={showNearbyOnly}
+                onCheckedChange={setShowNearbyOnly}
+              />
+              <Label htmlFor="nearby-only">Show only nearby issues</Label>
+            </div>
+
+            {showNearbyOnly && (
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={requestLocation}
+                  disabled={location !== null}
+                  className="flex items-center space-x-2"
+                >
+                  <Navigation className="h-4 w-4" />
+                  <span>{location ? 'Location detected' : 'Get my location'}</span>
+                </Button>
+
+                {location && (
+                  <div className="flex items-center space-x-2">
+                    <Label>Radius:</Label>
+                    <Slider
+                      value={[radiusKm]}
+                      onValueChange={(value) => setRadiusKm(value[0])}
+                      max={50}
+                      min={1}
+                      step={1}
+                      className="w-24"
+                    />
+                    <span className="text-sm text-gray-600">{radiusKm}km</span>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+
+          {showNearbyOnly && !location && (
+            <p className="text-sm text-amber-600">
+              Enable location access to see issues near you.
+            </p>
+          )}
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center space-x-2">
             <MessageCircle className="h-5 w-5" />
-            <span>Your Issue Reports ({issues.length})</span>
+            <span>Your Issue Reports ({filteredIssues.length})</span>
           </CardTitle>
         </CardHeader>
         <CardContent className="p-6">
           <div className="grid gap-4">
-            {issues.map((issue) => (
+            {filteredIssues.map((issue) => (
               <Card key={issue.id} className="border-l-4 border-l-blue-500">
                 <CardContent className="p-4">
                   <div className="flex justify-between items-start mb-3">
@@ -254,6 +345,11 @@ export function IssueTracker() {
                           <MapPin className="h-3 w-3" />
                           <span>Location: {issue.latitude && issue.longitude ? `${issue.latitude.toFixed(4)}, ${issue.longitude.toFixed(4)}` : 'Not specified'}</span>
                         </span>
+                        {location && issue.latitude && issue.longitude && (
+                          <span className="text-blue-600">
+                            {getDistanceText(issue.latitude, issue.longitude)}
+                          </span>
+                        )}
                         <span>Reported: {formatDate(issue.created_at)}</span>
                         <span className="capitalize">{issue.category?.name || 'General'}</span>
                       </div>
@@ -302,18 +398,15 @@ export function IssueTracker() {
 
                   {/* Actions */}
                   <div className="flex justify-between items-center">
-                    <div className="flex items-center space-x-2">
-                      <Button
-                        variant="outline"
+                    <div className="flex items-center space-x-4">
+                      {/* Voting Button */}
+                      <VoteButton
+                        issueId={issue.id}
+                        initialUpvotes={Math.max(0, (issue.vote_count || 0))}
+                        initialDownvotes={0}
                         size="sm"
-                        onClick={() => handleVote(issue.id)}
-                        disabled={false}
-                        className="flex items-center space-x-1"
-                      >
-                        <ThumbsUp className="h-3 w-3" />
-                        <span>{issue.vote_count || 0}</span>
-                      </Button>
-                      
+                      />
+
                       <Button
                         variant="outline"
                         size="sm"
@@ -332,7 +425,7 @@ export function IssueTracker() {
                         {selectedIssue === issue.id ? 'Hide Details' : 'View Details'}
                       </Button>
                     </div>
-                    
+
                     <div className="text-xs text-gray-500">
                       ID: {issue.id.substring(0, 8)}...
                     </div>

@@ -407,11 +407,120 @@ export const demoService = {
   // Clear demo data
   clearData: () => {
     if (typeof window === 'undefined') return;
-    
+
     localStorage.removeItem('demo_categories');
     localStorage.removeItem('demo_departments');
     localStorage.removeItem('demo_issues');
     localStorage.removeItem('demo_profiles');
+    localStorage.removeItem('demo_votes');
     console.log('🧹 Demo data cleared');
+  },
+
+  // Voting functions for demo mode
+  getUserVote: async (issueId: string, userId: string): Promise<'upvote' | 'downvote' | null> => {
+    if (typeof window === 'undefined') return null;
+
+    const votes = JSON.parse(localStorage.getItem('demo_votes') || '[]');
+    const userVote = votes.find((v: any) => v.issue_id === issueId && v.user_id === userId);
+    return userVote ? userVote.vote_type : null;
+  },
+
+  voteOnIssue: async (issueId: string, userId: string, voteType: 'upvote' | 'downvote'): Promise<boolean> => {
+    if (typeof window === 'undefined') return false;
+
+    const votes = JSON.parse(localStorage.getItem('demo_votes') || '[]');
+    const existingVoteIndex = votes.findIndex((v: any) => v.issue_id === issueId && v.user_id === userId);
+
+    if (existingVoteIndex >= 0) {
+      const existingVote = votes[existingVoteIndex];
+      if (existingVote.vote_type === voteType) {
+        // Remove vote
+        votes.splice(existingVoteIndex, 1);
+      } else {
+        // Change vote
+        votes[existingVoteIndex] = {
+          ...existingVote,
+          vote_type: voteType,
+          updated_at: new Date().toISOString()
+        };
+      }
+    } else {
+      // Add new vote
+      votes.push({
+        id: Date.now().toString(),
+        issue_id: issueId,
+        user_id: userId,
+        vote_type: voteType,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      });
+    }
+
+    localStorage.setItem('demo_votes', JSON.stringify(votes));
+
+    // Update issue vote count
+    const issues = JSON.parse(localStorage.getItem('demo_issues') || '[]');
+    const issueIndex = issues.findIndex((i: any) => i.id === issueId);
+
+    if (issueIndex >= 0) {
+      const upvotes = votes.filter((v: any) => v.issue_id === issueId && v.vote_type === 'upvote').length;
+      const downvotes = votes.filter((v: any) => v.issue_id === issueId && v.vote_type === 'downvote').length;
+      issues[issueIndex].vote_count = upvotes - downvotes;
+      localStorage.setItem('demo_issues', JSON.stringify(issues));
+    }
+
+    return true;
+  },
+
+  getVoteStats: async (issueId: string): Promise<{ upvotes: number; downvotes: number; userVote: 'upvote' | 'downvote' | null }> => {
+    if (typeof window === 'undefined') return { upvotes: 0, downvotes: 0, userVote: null };
+
+    const votes = JSON.parse(localStorage.getItem('demo_votes') || '[]');
+    const issueVotes = votes.filter((v: any) => v.issue_id === issueId);
+
+    const upvotes = issueVotes.filter((v: any) => v.vote_type === 'upvote').length;
+    const downvotes = issueVotes.filter((v: any) => v.vote_type === 'downvote').length;
+
+    // For demo, assume current user is the first profile
+    const profiles = JSON.parse(localStorage.getItem('demo_profiles') || '[]');
+    const currentUser = profiles.length > 0 ? profiles[0] : null;
+    const userVote = currentUser ? await demoService.getUserVote(issueId, currentUser.id) : null;
+
+    return { upvotes, downvotes, userVote };
+  },
+
+  // Location functions for demo mode
+  getNearbyIssues: async (userLat: number, userLng: number, radiusKm: number = 10): Promise<Issue[]> => {
+    if (typeof window === 'undefined') return [];
+
+    const issues = JSON.parse(localStorage.getItem('demo_issues') || '[]');
+
+    return issues.filter((issue: any) => {
+      if (!issue.latitude || !issue.longitude) return false;
+
+      const distance = demoService.calculateDistance(
+        userLat, userLng,
+        issue.latitude, issue.longitude
+      );
+
+      return distance <= radiusKm;
+    });
+  },
+
+  calculateDistance: (lat1: number, lng1: number, lat2: number, lng2: number): number => {
+    const R = 6371; // Earth's radius in kilometers
+    const dLat = demoService.toRadians(lat2 - lat1);
+    const dLng = demoService.toRadians(lng2 - lng1);
+
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+              Math.cos(demoService.toRadians(lat1)) * Math.cos(demoService.toRadians(lat2)) *
+              Math.sin(dLng / 2) * Math.sin(dLng / 2);
+
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  },
+
+  toRadians: (degrees: number): number => {
+    return degrees * (Math.PI / 180);
   }
 };
