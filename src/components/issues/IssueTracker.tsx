@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Clock,
   CheckCircle,
@@ -25,13 +26,16 @@ import {
   Save,
   X,
   Navigation,
-  Filter
+  Filter,
+  List,
+  Map
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { StatusBadge } from '@/components/issues/StatusBadge';
 import { VoteButton } from '@/components/ui/VoteButton';
 import { useLocationFilter } from '@/hooks/useLocation';
+import { MapView } from '@/components/maps/MapView';
 import { issueService, categoryService, departmentService } from '@/lib/database';
 import type { Database } from '@/lib/database.types';
 
@@ -48,6 +52,7 @@ export function IssueTracker() {
   const [loading, setLoading] = useState(true);
   const [selectedIssue, setSelectedIssue] = useState<string | null>(null);
   const [editingIssue, setEditingIssue] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
   const [editForm, setEditForm] = useState({
     title: '',
     description: '',
@@ -314,6 +319,21 @@ export function IssueTracker() {
         </CardContent>
       </Card>
 
+      {/* View Tabs */}
+      <Tabs value={viewMode} onValueChange={(value) => setViewMode(value as 'list' | 'map')}>
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="list" className="flex items-center space-x-2">
+            <List className="h-4 w-4" />
+            <span>List View</span>
+          </TabsTrigger>
+          <TabsTrigger value="map" className="flex items-center space-x-2">
+            <Map className="h-4 w-4" />
+            <span>Map View</span>
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="list" className="mt-6">
+
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center space-x-2">
@@ -569,6 +589,16 @@ export function IssueTracker() {
           </div>
         </DialogContent>
       </Dialog>
+        </TabsContent>
+
+        <TabsContent value="map" className="mt-6">
+          <MapView 
+            issues={filteredIssues}
+            showUserLocation={true}
+            onIssueSelect={(issue) => setSelectedIssue(issue.id)}
+          />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

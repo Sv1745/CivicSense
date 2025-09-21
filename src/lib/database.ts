@@ -427,6 +427,11 @@ export const issueService = {
     }
     
     return data;
+  },
+
+  // Delegate to locationService for nearby issues
+  async getNearbyIssues(lat: number, lng: number, radiusKm: number = 5): Promise<Issue[]> {
+    return locationService.getNearbyIssues(lat, lng, radiusKm);
   }
 };
 
@@ -913,23 +918,33 @@ export const voteService = {
       return await demoService.getUserVote(issueId, userId);
     }
 
-    const { data, error } = await supabase
-      .from('votes')
-      .select('vote_type')
-      .eq('issue_id', issueId)
-      .eq('user_id', userId)
-      .single();
+    try {
+      const { data, error } = await supabase
+        .from('votes')
+        .select('vote_type')
+        .eq('issue_id', issueId)
+        .eq('user_id', userId)
+        .single();
 
-    if (error) {
-      if (error.code === 'PGRST116') {
-        // No vote found
+      if (error) {
+        if (error.code === 'PGRST116') {
+          // No vote found
+          return null;
+        }
+        if (error.code === '42P01') {
+          // Table doesn't exist, fall back to demo mode
+          console.log('Votes table not found, falling back to demo mode');
+          return await demoService.getUserVote(issueId, userId);
+        }
+        console.error('Error fetching user vote:', error);
         return null;
       }
-      console.error('Error fetching user vote:', error);
-      return null;
-    }
 
-    return data.vote_type;
+      return data.vote_type;
+    } catch (err) {
+      console.error('getUserVote error:', err);
+      return await demoService.getUserVote(issueId, userId);
+    }
   },
 
   async voteOnIssue(issueId: string, userId: string, voteType: 'upvote' | 'downvote'): Promise<boolean> {
@@ -951,6 +966,10 @@ export const voteService = {
 
         if (error) {
           console.error('Error removing vote:', error);
+          if (error.code === '42P01') {
+            // Table doesn't exist, fall back to demo mode
+            return await demoService.voteOnIssue(issueId, userId, voteType);
+          }
           return false;
         }
         return true;
@@ -964,6 +983,9 @@ export const voteService = {
 
         if (error) {
           console.error('Error updating vote:', error);
+          if (error.code === '42P01') {
+            return await demoService.voteOnIssue(issueId, userId, voteType);
+          }
           return false;
         }
         return true;
@@ -979,13 +1001,16 @@ export const voteService = {
 
         if (error) {
           console.error('Error inserting vote:', error);
+          if (error.code === '42P01') {
+            return await demoService.voteOnIssue(issueId, userId, voteType);
+          }
           return false;
         }
         return true;
       }
     } catch (error) {
       console.error('Error voting on issue:', error);
-      return false;
+      return await demoService.voteOnIssue(issueId, userId, voteType);
     }
   },
 
@@ -1003,11 +1028,15 @@ export const voteService = {
 
       if (votesError) {
         console.error('Error fetching vote stats:', votesError);
+        if (votesError.code === '42P01') {
+          // Table doesn't exist, fall back to demo mode
+          return await demoService.getVoteStats(issueId);
+        }
         return { upvotes: 0, downvotes: 0, userVote: null };
       }
 
-      const upvotes = votes.filter(v => v.vote_type === 'upvote').length;
-      const downvotes = votes.filter(v => v.vote_type === 'downvote').length;
+      const upvotes = votes ? votes.filter(v => v.vote_type === 'upvote').length : 0;
+      const downvotes = votes ? votes.filter(v => v.vote_type === 'downvote').length : 0;
 
       // Get current user's vote (if authenticated)
       let userVote: 'upvote' | 'downvote' | null = null;
@@ -1023,7 +1052,7 @@ export const voteService = {
       return { upvotes, downvotes, userVote };
     } catch (error) {
       console.error('Error getting vote stats:', error);
-      return { upvotes: 0, downvotes: 0, userVote: null };
+      return await demoService.getVoteStats(issueId);
     }
   }
 };

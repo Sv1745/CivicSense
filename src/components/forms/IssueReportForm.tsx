@@ -26,10 +26,12 @@ import {
   Loader2, 
   Camera, 
   X,
-  CheckCircle
+  CheckCircle,
+  AlertTriangle
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
+import { DuplicateCheck } from "@/components/issues/DuplicateCheck";
 import { categoryService, departmentService, issueService, storageService } from "@/lib/database";
 import type { Database } from "@/lib/database.types";
 
@@ -69,6 +71,7 @@ export function IssueReportForm() {
   const [isRecording, setIsRecording] = useState(false);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [isLoadingData, setIsLoadingData] = useState(true);
+  const [isDuplicateDetected, setIsDuplicateDetected] = useState(false);
   
   const { toast } = useToast();
   const { user } = useAuth();
@@ -640,6 +643,17 @@ export function IssueReportForm() {
               )}
             />
 
+            {/* Duplicate Issue Detection */}
+            <DuplicateCheck
+              title={form.watch("title") || ""}
+              description={form.watch("description") || ""}
+              categoryId={form.watch("category_id") || undefined}
+              latitude={locationData?.lat}
+              longitude={locationData?.lng}
+              onDuplicateFound={setIsDuplicateDetected}
+              className="my-4"
+            />
+
             <div className="grid md:grid-cols-2 gap-4">
               <FormField
                 control={form.control}
@@ -939,9 +953,26 @@ export function IssueReportForm() {
               </div>
             )}
             
-            <Button type="submit" className="w-full" size="lg" disabled={isSubmitting}>
+            {isDuplicateDetected && (
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-4">
+                <div className="flex items-center space-x-2 text-amber-800">
+                  <AlertTriangle className="h-5 w-5" />
+                  <span className="font-semibold">Potential Duplicate Detected</span>
+                </div>
+                <p className="text-amber-700 text-sm mt-2">
+                  Please review the similar issues above. Consider voting on an existing issue instead of creating a duplicate.
+                </p>
+              </div>
+            )}
+
+            <Button 
+              type="submit" 
+              className={`w-full ${isDuplicateDetected ? 'bg-amber-600 hover:bg-amber-700' : ''}`} 
+              size="lg" 
+              disabled={isSubmitting}
+            >
               {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Submit Issue Report
+              {isDuplicateDetected ? 'Submit Anyway (Not Recommended)' : 'Submit Issue Report'}
             </Button>
           </form>
         </Form>

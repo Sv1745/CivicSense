@@ -1,14 +1,18 @@
 'use client';
 
+import { useState } from 'react';
 import { Header } from "@/components/layout/Header";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { UserProfileForm } from "@/components/forms/UserProfileForm";
+import { UserDashboard } from "@/components/dashboard/UserDashboard";
 import { ProfileDebugHelper } from "@/components/debug/ProfileDebugHelper";
 import { SimpleProfileTest } from "@/components/debug/SimpleProfileTest";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { AlertCircle, CheckCircle, Loader2 } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { AlertCircle, CheckCircle, Loader2, User, BarChart3, Settings } from "lucide-react";
 
 function ProfileDiagnostic() {
   const { user, loading, isOffline } = useAuth();
@@ -81,23 +85,56 @@ function ProfileDiagnostic() {
 }
 
 export default function ProfilePage() {
+  const [activeTab, setActiveTab] = useState('dashboard');
+
   return (
     <ProtectedRoute requireAuth={true}>
       <div className="flex min-h-screen w-full flex-col">
         <Header />
-        <main className="flex-1 py-12 md:py-16">
-          <div className="container mx-auto max-w-2xl px-4">
+        <main className="flex-1">
+          <div className="container mx-auto px-4 py-8">
             <div className="space-y-2 text-center mb-8">
-              <h1 className="text-3xl font-bold tracking-tighter sm:text-4xl font-headline">My Profile</h1>
+              <h1 className="text-3xl font-bold tracking-tighter sm:text-4xl font-headline">Your Profile</h1>
               <p className="text-muted-foreground">
-                Manage your account information and preferences.
+                Manage your civic engagement, issues, and account settings.
               </p>
             </div>
 
-            <ProfileDiagnostic />
-            <SimpleProfileTest />
-            <ProfileDebugHelper />
-            <UserProfileForm />
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+              <TabsList className="grid w-full grid-cols-3">
+                <TabsTrigger value="dashboard" className="flex items-center space-x-2">
+                  <BarChart3 className="h-4 w-4" />
+                  <span>Dashboard</span>
+                </TabsTrigger>
+                <TabsTrigger value="profile" className="flex items-center space-x-2">
+                  <User className="h-4 w-4" />
+                  <span>Profile Settings</span>
+                </TabsTrigger>
+                <TabsTrigger value="debug" className="flex items-center space-x-2">
+                  <Settings className="h-4 w-4" />
+                  <span>Debug Info</span>
+                </TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="dashboard">
+                <UserDashboard />
+              </TabsContent>
+
+              <TabsContent value="profile" className="max-w-2xl mx-auto">
+                <div className="space-y-6">
+                  <ProfileDiagnostic />
+                  <UserProfileForm />
+                </div>
+              </TabsContent>
+
+              <TabsContent value="debug" className="max-w-4xl mx-auto">
+                <div className="space-y-6">
+                  <ProfileDiagnostic />
+                  <SimpleProfileTest />
+                  <ProfileDebugHelper />
+                </div>
+              </TabsContent>
+            </Tabs>
           </div>
         </main>
       </div>

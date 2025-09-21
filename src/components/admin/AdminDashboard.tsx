@@ -2,10 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { CheckCircle, Clock, ListFilter, ListTodo, AlertTriangle, UserCheck, Bell, RefreshCw } from "lucide-react";
+import { CheckCircle, Clock, ListFilter, ListTodo, AlertTriangle, UserCheck, Bell, RefreshCw, Map, BarChart3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AnalyticsCharts } from "./AnalyticsCharts";
 import { IssueDataTable } from "./IssueDataTable";
+import { AdminMapView } from "./AdminMapView";
 import { useIssueChanges, useNotifications } from "@/hooks/useRealtime";
 import { issueService, profileService, isDemoMode } from "@/lib/database";
 import { supabase } from "@/lib/supabase";
@@ -237,21 +239,51 @@ export function AdminDashboard() {
         </Card>
       )}
 
-      {/* Analytics Charts */}
-      <AnalyticsCharts />
+      {/* Main Dashboard Tabs */}
+      <Tabs defaultValue="overview" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="overview" className="flex items-center space-x-2">
+            <BarChart3 className="h-4 w-4" />
+            <span>Overview</span>
+          </TabsTrigger>
+          <TabsTrigger value="table" className="flex items-center space-x-2">
+            <ListTodo className="h-4 w-4" />
+            <span>Issues Table</span>
+          </TabsTrigger>
+          <TabsTrigger value="map" className="flex items-center space-x-2">
+            <Map className="h-4 w-4" />
+            <span>Map View</span>
+          </TabsTrigger>
+        </TabsList>
 
-      {/* Issues Data Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Recent Issues</CardTitle>
-          <CardDescription>
-            Real-time view of all reported issues with live updates.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <IssueDataTable issues={allIssues} loading={issuesLoading} />
-        </CardContent>
-      </Card>
+        <TabsContent value="overview" className="space-y-6">
+          {/* Analytics Charts */}
+          <AnalyticsCharts />
+        </TabsContent>
+
+        <TabsContent value="table" className="space-y-6">
+          {/* Issues Data Table */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Issues Management</CardTitle>
+              <CardDescription>
+                Real-time view of all reported issues with live updates and status management.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <IssueDataTable issues={allIssues} loading={issuesLoading} />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="map" className="space-y-6">
+          {/* Admin Map View */}
+          <AdminMapView 
+            issues={allIssues}
+            showMunicipalityBounds={true}
+          />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

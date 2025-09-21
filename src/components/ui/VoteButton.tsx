@@ -1,11 +1,14 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { ChevronUp, ChevronDown } from 'lucide-react';
+import { ChevronUp, ChevronDown, Info, MapPin } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { voteService } from '@/lib/database';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { voteService, issueService } from '@/lib/database';
+import { duplicateDetectionService } from '@/lib/duplicate-detection';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import { useLocationFilter } from '@/hooks/useLocation';
 
 interface VoteButtonProps {
   issueId: string;
@@ -14,6 +17,7 @@ interface VoteButtonProps {
   initialUserVote?: 'upvote' | 'downvote' | null;
   size?: 'sm' | 'md' | 'lg';
   variant?: 'default' | 'outline' | 'ghost';
+  enforceAreaRestrictions?: boolean;
 }
 
 export function VoteButton({
@@ -22,16 +26,21 @@ export function VoteButton({
   initialDownvotes = 0,
   initialUserVote = null,
   size = 'md',
-  variant = 'ghost'
+  variant = 'ghost',
+  enforceAreaRestrictions = true
 }: VoteButtonProps) {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { location } = useLocationFilter();
   const [upvotes, setUpvotes] = useState(initialUpvotes);
   const [downvotes, setDownvotes] = useState(initialDownvotes);
   const [userVote, setUserVote] = useState<'upvote' | 'downvote' | null>(initialUserVote);
   const [isLoading, setIsLoading] = useState(false);
+  const [canVote, setCanVote] = useState(true);
+  const [votingReason, setVotingReason] = useState('');
+  const [issue, setIssue] = useState<any>(null);
 
-  // Load vote stats on mount
+  // Load vote stats and check permissions on mount
   useEffect(() => {
     const loadVoteStats = async () => {
       try {
@@ -44,14 +53,59 @@ export function VoteButton({
       }
     };
 
+    const loadIssueAndCheckPermissions = async () => {
+      if (!user || !enforceAreaRestrictions) {
+        setCanVote(true);
+        setVotingReason('');
+        return;
+      }
+
+      try {
+        // Load issue details
+        const issueData = await issueService.getIssueById(issueId);
+        setIssue(issueData);
+
+        if (!issueData) {
+          setCanVote(false);
+          setVotingReason('Issue not found');
+          return;
+        }
+
+        // Check voting permissions
+        const result = await duplicateDetectionService.canUserVoteOnIssue(
+          user.id,
+          issueData,
+          location?.latitude,
+          location?.longitude
+        );
+
+        setCanVote(result.canVote);
+        setVotingReason(result.reason);
+      } catch (error) {
+        console.error('Error checking voting permissions:', error);
+        setCanVote(false);
+        setVotingReason('Error checking permissions');
+      }
+    };
+
     loadVoteStats();
-  }, [issueId]);
+    loadIssueAndCheckPermissions();
+  }, [issueId, user, location, enforceAreaRestrictions]);
 
   const handleVote = async (voteType: 'upvote' | 'downvote') => {
     if (!user) {
       toast({
         title: 'Authentication Required',
         description: 'Please sign in to vote on issues.',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    if (enforceAreaRestrictions && !canVote) {
+      toast({
+        title: 'Voting Restricted',
+        description: votingReason,
         variant: 'destructive'
       });
       return;
@@ -127,43 +181,101 @@ export function VoteButton({
     lg: 'h-6 w-6'
   };
 
+  const isVotingDisabled = isLoading || (enforceAreaRestrictions && !canVote);
+
   return (
-    <div className="flex flex-col items-center gap-1">
-      {/* Upvote Button */}
-      <Button
-        variant={userVote === 'upvote' ? 'default' : variant}
-        size="sm"
-        className={`${sizeClasses[size]} p-0 ${userVote === 'upvote' ? 'bg-green-600 hover:bg-green-700' : ''}`}
-        onClick={() => handleVote('upvote')}
-        disabled={isLoading}
-      >
-        <ChevronUp className={iconSizeClasses[size]} />
-      </Button>
+    <TooltipProvider>
+      <div className="flex flex-col items-center gap-2 bg-gray-50 rounded-lg p-2 min-w-[60px] relative">
+        {/* Voting restriction indicator */}
+        {enforceAreaRestrictions && !canVote && (
+          <div className="absolute -top-2 -right-2 z-10">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="bg-amber-500 text-white rounded-full p-1">
+                  <Info className="h-3 w-3" />
+                </div>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="max-w-xs">
+                <p className="text-sm">{votingReason}</p>
+                {location && (
+                  <p className="text-xs mt-1 text-gray-300">
+                    Enable location access for area-based voting
+                  </p>
+                )}
+              </TooltipContent>
+            </Tooltip>
+          </div>
+        )}
 
-      {/* Vote Count */}
-      <div className="text-center min-w-[3rem]">
-        <span className={`font-semibold text-sm ${
-          upvotes - downvotes > 0 ? 'text-green-600' :
-          upvotes - downvotes < 0 ? 'text-red-600' : 'text-gray-600'
-        }`}>
-          {upvotes - downvotes}
-        </span>
-        <div className="text-xs text-gray-500 leading-tight">
-          <div>{upvotes}↑</div>
-          <div>{downvotes}↓</div>
+        {/* Upvote Button */}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              className={`
+                w-10 h-10 rounded-full border-2 flex items-center justify-center transition-all duration-200
+                ${userVote === 'upvote' 
+                  ? 'bg-green-500 border-green-500 text-white shadow-lg transform scale-110' 
+                  : 'bg-white border-gray-300 text-gray-600'
+                }
+                ${isVotingDisabled 
+                  ? 'opacity-50 cursor-not-allowed' 
+                  : 'cursor-pointer hover:scale-105 hover:border-green-400 hover:text-green-500 hover:shadow-md'
+                }
+              `}
+              onClick={() => handleVote('upvote')}
+              disabled={isVotingDisabled}
+            >
+              <ChevronUp className={`${iconSizeClasses[size]} stroke-[2.5]`} />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="left">
+            <p className="text-sm">
+              {isVotingDisabled && enforceAreaRestrictions ? votingReason : 'Upvote this issue'}
+            </p>
+          </TooltipContent>
+        </Tooltip>
+
+        {/* Vote Count */}
+        <div className="text-center">
+          <div className={`font-bold text-lg leading-none ${
+            upvotes - downvotes > 0 ? 'text-green-600' :
+            upvotes - downvotes < 0 ? 'text-red-600' : 'text-gray-700'
+          }`}>
+            {upvotes - downvotes}
+          </div>
+          <div className="text-xs text-gray-500 mt-1">
+            {upvotes + downvotes} votes
+          </div>
         </div>
-      </div>
 
-      {/* Downvote Button */}
-      <Button
-        variant={userVote === 'downvote' ? 'default' : variant}
-        size="sm"
-        className={`${sizeClasses[size]} p-0 ${userVote === 'downvote' ? 'bg-red-600 hover:bg-red-700' : ''}`}
-        onClick={() => handleVote('downvote')}
-        disabled={isLoading}
-      >
-        <ChevronDown className={iconSizeClasses[size]} />
-      </Button>
-    </div>
+        {/* Downvote Button */}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              className={`
+                w-10 h-10 rounded-full border-2 flex items-center justify-center transition-all duration-200
+                ${userVote === 'downvote' 
+                  ? 'bg-red-500 border-red-500 text-white shadow-lg transform scale-110' 
+                  : 'bg-white border-gray-300 text-gray-600'
+                }
+                ${isVotingDisabled 
+                  ? 'opacity-50 cursor-not-allowed' 
+                  : 'cursor-pointer hover:scale-105 hover:border-red-400 hover:text-red-500 hover:shadow-md'
+                }
+              `}
+              onClick={() => handleVote('downvote')}
+              disabled={isVotingDisabled}
+            >
+              <ChevronDown className={`${iconSizeClasses[size]} stroke-[2.5]`} />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="left">
+            <p className="text-sm">
+              {isVotingDisabled && enforceAreaRestrictions ? votingReason : 'Downvote this issue'}
+            </p>
+          </TooltipContent>
+        </Tooltip>
+      </div>
+    </TooltipProvider>
   );
 }
