@@ -1,4 +1,4 @@
-# 🚀 Supabase Setup Guide for CivicSense
+# 🚀 Supabase Setup Guide for CivicNetra
 
 Follow these steps to configure your Supabase database for real-time data storage.
 
@@ -10,7 +10,7 @@ Follow these steps to configure your Supabase database for real-time data storag
 ## 🗄️ Step 1: Set Up Database Schema
 
 1. Go to your Supabase dashboard: https://supabase.com/dashboard
-2. Select your project: `CivicSense`
+2. Select your project: `CivicNetra`
 3. Navigate to **SQL Editor** (left sidebar)
 4. Click **"+ New Query"**
 5. Copy and paste the entire contents of `supabase-setup.sql` into the editor

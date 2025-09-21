@@ -64,7 +64,7 @@ export function PWAInstallPrompt() {
         <div className="flex items-start justify-between mb-3">
           <div className="flex items-center space-x-2">
             <Download className="h-5 w-5 text-blue-600" />
-            <h3 className="font-semibold text-sm">Install CivicSense</h3>
+            <h3 className="font-semibold text-sm">Install CivicNetra</h3>
           </div>
           <Button
             variant="ghost"
@@ -77,7 +77,7 @@ export function PWAInstallPrompt() {
         </div>
         
         <p className="text-xs text-gray-600 mb-3">
-          Install CivicSense for quick access and offline support
+          Install CivicNetra for quick access and offline support
         </p>
         
         <div className="flex space-x-2">

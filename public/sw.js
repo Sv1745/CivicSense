@@ -1,4 +1,4 @@
-const CACHE_NAME = 'civicsense-v1';
+const CACHE_NAME = 'CivicNetra-v1';
 const urlsToCache = [
   '/',
   '/manifest.json',
@@ -74,7 +74,7 @@ self.addEventListener('push', (event) => {
   };
 
   event.waitUntil(
-    self.registration.showNotification('CivicSense Update', options)
+    self.registration.showNotification('CivicNetra Update', options)
   );
 });
 

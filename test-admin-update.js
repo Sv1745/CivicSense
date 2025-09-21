@@ -31,7 +31,7 @@ async function testAdminIssueUpdate() {
     // Sign in as admin
     console.log('1. Signing in as admin...');
     const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-      email: 'admin@civicsense.com',
+      email: 'admin@CivicNetra.com',
       password: 'test123456'
     });
 

@@ -12,7 +12,7 @@ class OfflineModeService {
   private config: OfflineModeConfig = {
     enabled: false,
     showBanner: true,
-    fallbackMessage: 'CivicSense is currently in offline mode. Some features may be limited.'
+    fallbackMessage: 'CivicNetra is currently in offline mode. Some features may be limited.'
   };
 
   private isOnline = true;

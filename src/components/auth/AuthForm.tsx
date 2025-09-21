@@ -86,7 +86,7 @@ export function AuthForm({ mode, onSwitchMode }: AuthFormProps) {
         await signUp(values.email, values.password, values.displayName);
         toast({
           title: 'Account created!',
-          description: 'Welcome to CivicSense. You can now report issues.',
+          description: 'Welcome to CivicNetra. You can now report issues.',
         });
       }
     } catch (error: any) {
@@ -151,7 +151,7 @@ export function AuthForm({ mode, onSwitchMode }: AuthFormProps) {
         <CardDescription>
           {isLogin
             ? 'Enter your credentials to access your account'
-            : 'Join CivicSense to report and track civic issues'
+            : 'Join CivicNetra to report and track civic issues'
           }
         </CardDescription>
       </CardHeader>

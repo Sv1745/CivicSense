@@ -1037,7 +1037,7 @@ export const locationService = {
 
     try {
       // Use PostGIS for efficient proximity search
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .rpc('get_nearby_issues', {
           user_lat: userLat,
           user_lng: userLng,
@@ -1136,3 +1136,4 @@ export const locationService = {
     });
   }
 };
+

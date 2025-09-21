@@ -1,4 +1,4 @@
-# CivicSense Storage Setup Guide
+# CivicNetra Storage Setup Guide
 
 ## Issue: Document Uploads Stuck at 10%
 
@@ -8,7 +8,7 @@ This issue occurs when Supabase storage buckets are not properly configured. Fol
 
 1. Go to [Supabase Dashboard](https://supabase.com/dashboard)
 2. Sign in to your account
-3. Navigate to your CivicSense project
+3. Navigate to your CivicNetra project
 
 ## Step 2: Create Storage Buckets
 

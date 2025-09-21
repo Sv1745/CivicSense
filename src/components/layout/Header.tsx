@@ -40,7 +40,7 @@ export function Header() {
           <div className="mr-4 flex items-center">
             <Link href="/" className="mr-6 flex items-center space-x-2">
               <Bug className="h-6 w-6 text-primary" />
-              <span className="font-bold">CivicSense</span>
+              <span className="font-bold">CivicNetra</span>
             </Link>
           </div>
           <div className="flex flex-1 items-center justify-end space-x-4">
@@ -61,7 +61,7 @@ export function Header() {
         <div className="mr-4 flex items-center">
           <Link href="/" className="mr-6 flex items-center space-x-2">
             <Bug className="h-6 w-6 text-primary" />
-            <span className="font-bold">CivicSense</span>
+            <span className="font-bold">CivicNetra</span>
           </Link>
           <nav className="flex items-center space-x-6 text-sm font-medium">
             <Link

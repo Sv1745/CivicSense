@@ -1,4 +1,4 @@
--- Supabase Storage Setup for CivicSense
+-- Supabase Storage Setup for CivicNetra
 
 -- Create storage buckets
 INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)

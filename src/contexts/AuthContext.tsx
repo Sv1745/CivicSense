@@ -70,7 +70,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         
         const demoUser: Profile = {
           id: 'demo-user-123',
-          email: 'demo@civicsense.com',
+          email: 'demo@CivicNetra.com',
           full_name: 'Demo User',
           avatar_url: null,
           phone: null,
@@ -305,7 +305,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Fallback for server-side rendering
       currentOrigin = process.env.VERCEL_URL
         ? `https://${process.env.VERCEL_URL}`
-        : (process.env.NEXT_PUBLIC_APP_URL || 'https://civicsensesih.vercel.app/');
+        : (process.env.NEXT_PUBLIC_APP_URL || 'https://CivicNetrasih.vercel.app/');
     }
 
   // Redirect back to root so client-side Supabase can finish the PKCE exchange

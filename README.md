@@ -1,4 +1,4 @@
-# CivicSense - Smart Civic Issue Reporting Platform
+# CivicNetra - Smart Civic Issue Reporting Platform
 
 A comprehensive Next.js application for civic issue reporting and management, built with Supabase backend, real-time updates, and modern UI components.
 
@@ -117,4 +117,4 @@ src/
 └── contexts/           # Authentication and state management
 ```
 
-**CivicSense** - Empowering communities through technology 🌟
+**CivicNetra** - Empowering communities through technology 🌟

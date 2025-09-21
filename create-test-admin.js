@@ -29,7 +29,7 @@ async function createTestAdmin() {
     console.log('👤 Creating test admin user...\n');
 
     // Test credentials
-    const testEmail = 'admin@civicsense.com';
+    const testEmail = 'admin@CivicNetra.com';
     const testPassword = 'test123456';
 
     console.log('1. Attempting to sign up test admin...');
@@ -102,7 +102,7 @@ async function createTestAdmin() {
     }
 
     console.log('\n🎉 Test admin setup complete!');
-    console.log('📧 Email: admin@civicsense.test');
+    console.log('📧 Email: admin@CivicNetra.test');
     console.log('🔑 Password: test123456');
     console.log('👑 Role: admin');
     console.log('\n💡 Use these credentials to log in to the app and test issue updates');

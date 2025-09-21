@@ -83,17 +83,8 @@ export function IssueTracker() {
       try {
         let userIssues: Issue[];
 
-        if (showNearbyOnly && location) {
-          // Get nearby issues
-          userIssues = await issueService.getNearbyIssues(
-            location.latitude,
-            location.longitude,
-            radiusKm
-          );
-        } else {
-          // Get all user issues
-          userIssues = await issueService.getUserIssues(user.id);
-        }
+        // Always get all user issues, filter nearby below
+        userIssues = await issueService.getUserIssues(user.id);
 
         const [allCategories, allDepartments] = await Promise.all([
           categoryService.getCategories(),

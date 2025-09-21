@@ -1,4 +1,4 @@
--- CivicSense Database Schema Setup for Supabase
+-- CivicNetra Database Schema Setup for Supabase
 -- Run this script in your Supabase SQL Editor
 
 -- Enable necessary extensions

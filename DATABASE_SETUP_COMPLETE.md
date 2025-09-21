@@ -1,4 +1,4 @@
-# Database Setup Guide for CivicSense
+# Database Setup Guide for CivicNetra
 
 ## Problem
 You're getting the error: "Issue creation timed out after 15 seconds - this usually means database tables need to be set up"
@@ -21,7 +21,7 @@ Copy and paste the entire content from `supabase-setup.sql` into the SQL editor 
 **OR** you can run this comprehensive setup script:
 
 ```sql
--- CivicSense Database Schema Setup for Supabase
+-- CivicNetra Database Schema Setup for Supabase
 -- Run this script in your Supabase SQL Editor
 
 -- Enable necessary extensions

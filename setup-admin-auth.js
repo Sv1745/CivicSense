@@ -33,7 +33,7 @@ async function setupTestAdmin() {
   try {
     console.log('🔧 Setting up test admin for immediate use...\n');
 
-    const adminEmail = 'admin@civicsense.com';
+    const adminEmail = 'admin@CivicNetra.com';
     const adminPassword = 'test123456';
 
     // Method 1: Try to confirm the email using admin client

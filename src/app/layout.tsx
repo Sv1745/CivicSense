@@ -5,7 +5,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { OfflineBanner } from "@/components/ui/OfflineBanner";
 
 export const metadata: Metadata = {
-  title: 'CivicSense - Smart Civic Issue Reporting',
+  title: 'CivicNetra - Smart Civic Issue Reporting',
   description: 'Report civic issues, track their resolution, and make your city better.',
   manifest: '/manifest.json',
   icons: {

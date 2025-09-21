@@ -1,4 +1,4 @@
-# CivicSense Setup Guide
+# CivicNetra Setup Guide
 
 ## Prerequisites
 
@@ -11,7 +11,7 @@
 ### Create a New Supabase Project
 
 1. Go to [supabase.com](https://supabase.com) and create a new project
-2. Choose a project name (e.g., "CivicSense")
+2. Choose a project name (e.g., "CivicNetra")
 3. Set a secure database password
 4. Choose your preferred region
 
@@ -228,4 +228,4 @@ For issues and questions:
 
 ---
 
-This setup guide will get your CivicSense platform up and running with full Supabase integration, real-time features, and comprehensive civic issue management capabilities.
+This setup guide will get your CivicNetra platform up and running with full Supabase integration, real-time features, and comprehensive civic issue management capabilities.

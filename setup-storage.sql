@@ -1,4 +1,4 @@
--- Create storage buckets for CivicSense
+-- Create storage buckets for CivicNetra
 
 -- Issue Photos bucket (public)
 INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)

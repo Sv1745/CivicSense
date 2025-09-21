@@ -1,4 +1,4 @@
-# CivicSense Database Setup Guide
+# CivicNetra Database Setup Guide
 
 ## Step 1: Set up Supabase Database Schema
 
@@ -9,7 +9,7 @@ You need to run this SQL script in your Supabase Dashboard SQL Editor.
 Copy and paste this complete schema:
 
 ```sql
--- CivicSense Database Schema Setup for Supabase
+-- CivicNetra Database Schema Setup for Supabase
 -- Run this script in your Supabase SQL Editor
 
 -- Enable necessary extensions

@@ -1,6 +1,6 @@
 {
-  "name": "CivicSense - Civic Issue Reporting",
-  "short_name": "CivicSense",
+  "name": "CivicNetra - Civic Issue Reporting",
+  "short_name": "CivicNetra",
   "description": "Report and track civic issues in your community",
   "start_url": "/",
   "display": "standalone",

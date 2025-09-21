@@ -2,7 +2,7 @@
 
 ## Required Storage Buckets
 
-Your CivicSense app needs these storage buckets in Supabase for file uploads to work:
+Your CivicNetra app needs these storage buckets in Supabase for file uploads to work:
 
 ### 1. issue-photos
 For storing issue report photos

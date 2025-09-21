@@ -1,9 +1,9 @@
 #!/bin/bash
 
-# CivicSense Database Setup Script for Indian Government Data
+# CivicNetra Database Setup Script for Indian Government Data
 # This script populates the Supabase database with comprehensive Indian government departments and categories
 
-echo "🇮🇳 Setting up CivicSense with Indian Government Data..."
+echo "🇮🇳 Setting up CivicNetra with Indian Government Data..."
 echo "=============================================="
 
 # Check if Supabase CLI is installed
@@ -39,7 +39,7 @@ psql -h localhost -p 54322 -d postgres -U postgres -f sql/indian-government-data
 echo ""
 echo "✅ Database setup complete!"
 echo ""
-echo "🎯 Your CivicSense application is now configured with:"
+echo "🎯 Your CivicNetra application is now configured with:"
 echo "   • 40+ Indian Government Departments"
 echo "   • 25+ Civic Issue Categories"
 echo "   • Complete database schema with RLS policies"
