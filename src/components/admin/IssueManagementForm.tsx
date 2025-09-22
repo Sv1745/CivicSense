@@ -196,15 +196,24 @@ export function IssueManagementForm({ issue, onUpdate }: IssueManagementFormProp
 
       // Send notification to issue reporter
       if (issue.user_id && issue.user_id !== user.id) {
-        console.log('📤 Sending notification to issue reporter...');
-        await notificationService.createNotification({
-          user_id: issue.user_id,
-          issue_id: issue.id,
-          title: `Issue Update: ${issue.title}`,
-          message: `Your issue has been updated. Status: ${statusConfig[values.status].label}`,
-          type: values.status === 'resolved' ? 'success' : 'info',
-        });
-        console.log('✅ Notification sent');
+        console.log('📤 Attempting to send notification to issue reporter...');
+        try {
+          const notification = await notificationService.createNotification({
+            user_id: issue.user_id,
+            issue_id: issue.id,
+            title: `Issue Update: ${issue.title}`,
+            message: `Your issue has been updated. Status: ${statusConfig[values.status].label}`,
+            type: values.status === 'resolved' ? 'success' : 'info',
+          });
+          
+          if (notification) {
+            console.log('✅ Notification sent successfully');
+          } else {
+            console.log('⚠️ Notification could not be sent (database limitations)');
+          }
+        } catch (error) {
+          console.log('⚠️ Notification failed (non-critical):', error);
+        }
       } else {
         console.log('ℹ️ Skipping notification (same user or no user_id)');
       }
