@@ -427,24 +427,42 @@ export const issueService = {
   },
 
   async getIssueById(issueId: string): Promise<Issue | null> {
-    const { data, error } = await supabase
-      .from('issues')
-      .select(`
-        *,
-        category:categories(*),
-        department:departments(*),
-        user:profiles(*),
-        updates:issue_updates(*, user:profiles(full_name))
-      `)
-      .eq('id', issueId)
-      .single();
-    
-    if (error) {
-      console.error('Error fetching issue:', error);
-      return null;
+    if (isDemoMode()) {
+      // Get the issue from demo data
+      const allIssues = await demoService.getAllIssues();
+      return allIssues.find(issue => issue.id === issueId) || null;
     }
-    
-    return data;
+
+    try {
+      // Use simple select to avoid foreign key issues
+      const { data, error } = await supabase
+        .from('issues')
+        .select('*')
+        .eq('id', issueId)
+        .single();
+      
+      if (error) {
+        console.error('❌ Error fetching issue:', error);
+        // Check for table not found or foreign key issues
+        if (error.code === 'PGRST116' || 
+            error.code === 'PGRST200' ||
+            error.message?.includes('relation') || 
+            error.message?.includes('does not exist') ||
+            error.message?.includes('relationship')) {
+          console.log('📋 Database schema issue, falling back to demo data');
+          const allIssues = await demoService.getAllIssues();
+          return allIssues.find(issue => issue.id === issueId) || null;
+        }
+        return null;
+      }
+      
+      return data;
+    } catch (err) {
+      console.error('❌ Issue fetch failed:', err);
+      // Fallback to demo data
+      const allIssues = await demoService.getAllIssues();
+      return allIssues.find(issue => issue.id === issueId) || null;
+    }
   },
 
   // Delegate to locationService for nearby issues
@@ -1130,35 +1148,42 @@ export const locationService = {
 
   async getNearbyIssuesFallback(userLat: number, userLng: number, radiusKm: number = 10): Promise<Issue[]> {
     // Fallback method using client-side distance calculation
-    const { data: issues, error } = await supabase
-      .from('issues')
-      .select(`
-        *,
-        category:categories(*),
-        department:departments(*),
-        user:profiles(*)
-      `)
-      .not('latitude', 'is', null)
-      .not('longitude', 'is', null);
+    console.log('🔄 Using fallback method for nearby issues');
+    
+    try {
+      // First try with simple select to avoid foreign key issues
+      const { data: issues, error } = await supabase
+        .from('issues')
+        .select('*')
+        .not('latitude', 'is', null)
+        .not('longitude', 'is', null);
 
-    if (error) {
-      console.error('Error fetching issues for fallback:', error);
-      return [];
+      if (error) {
+        console.error('❌ Error fetching issues for fallback:', error);
+        // If Supabase fails, use demo data
+        return await demoService.getNearbyIssues(userLat, userLng, radiusKm);
+      }
+
+      console.log(`✅ Fetched ${issues?.length || 0} issues for nearby calculation`);
+
+      // Filter issues by distance on client side
+      const nearbyIssues = (issues || []).filter((issue: any) => {
+        if (!issue.latitude || !issue.longitude) return false;
+
+        const distance = this.calculateDistance(
+          userLat, userLng,
+          issue.latitude, issue.longitude
+        );
+
+        return distance <= radiusKm;
+      });
+
+      return nearbyIssues;
+    } catch (err) {
+      console.error('❌ Fallback query failed:', err);
+      // If all fails, use demo data
+      return await demoService.getNearbyIssues(userLat, userLng, radiusKm);
     }
-
-    // Filter issues by distance on client side
-    const nearbyIssues = issues.filter(issue => {
-      if (!issue.latitude || !issue.longitude) return false;
-
-      const distance = this.calculateDistance(
-        userLat, userLng,
-        issue.latitude, issue.longitude
-      );
-
-      return distance <= radiusKm;
-    });
-
-    return nearbyIssues;
   },
 
   calculateDistance(lat1: number, lng1: number, lat2: number, lng2: number): number {

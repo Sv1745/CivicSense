@@ -246,14 +246,29 @@ export function MapView({
       {/* Map */}
       <Card>
         <CardContent className="p-0">
-          <LoadScript 
-            googleMapsApiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ''}
-            loadingElement={
-              <div style={{ height }} className="flex items-center justify-center">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-              </div>
-            }
-          >
+          {!process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY === 'your_google_maps_api_key_here' ? (
+            <div style={{ height }} className="flex flex-col items-center justify-center bg-gray-50 text-gray-600">
+              <MapPin className="h-12 w-12 mb-4 text-gray-400" />
+              <h3 className="text-lg font-semibold mb-2">Map View Unavailable</h3>
+              <p className="text-center text-sm max-w-md">
+                Google Maps API key is not configured. The map view requires a valid API key to display locations.
+              </p>
+              <p className="text-xs text-gray-500 mt-2">
+                Add NEXT_PUBLIC_GOOGLE_MAPS_API_KEY to your environment variables.
+              </p>
+            </div>
+          ) : (
+            <LoadScript 
+              googleMapsApiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}
+              loadingElement={
+                <div style={{ height }} className="flex items-center justify-center">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                </div>
+              }
+              onError={(error) => {
+                console.error('Google Maps loading error:', error);
+              }}
+            >
             <GoogleMap
               mapContainerStyle={{ ...mapContainerStyle, height }}
               center={location ? { lat: location.latitude, lng: location.longitude } : defaultCenter}
@@ -348,6 +363,7 @@ export function MapView({
               )}
             </GoogleMap>
           </LoadScript>
+          )}
         </CardContent>
       </Card>
 
